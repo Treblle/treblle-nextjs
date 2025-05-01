@@ -1,0 +1,50 @@
+# Source files (only dist/ should be published)
+src/
+examples/
+tests/
+
+# Configuration
+.eslintrc.js
+.prettierrc
+tsconfig.json
+jest.config.js
+.github/
+
+# Development files
+coverage/
+.nyc_output/
+.vscode/
+.idea/
+.circleci/
+.travis.yml
+.gitlab-ci.yml
+.editorconfig
+
+# Git files
+.git/
+.gitattributes
+.gitignore
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Unit test / coverage reports
+.coverage
+.coverage.*
+htmlcov/
+junit.xml
+
+# Documentation source files (if any)
+docs/
+
+# Environment variables
+.env
+.env.*
+
+# Temp files
+tmp/
+temp/
