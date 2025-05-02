@@ -30,7 +30,7 @@ export interface TreblleOptions {
     /**
      * Paths to exclude from monitoring
      * Can be string patterns or RegExp objects
-     * Examples: ['/health', '/metrics', /^\/admin\/.*/]
+     * Examples: ['/health', '/metrics', /^\/admin\/.*\]
      */
     excludePaths?: (string | RegExp)[];
     
@@ -38,7 +38,7 @@ export interface TreblleOptions {
      * Paths to include in monitoring
      * If specified, only these paths will be monitored
      * Can be string patterns or RegExp objects
-     * Examples: ['/api/v1/*', '/api/v2/*', /^\/public\/.*/]
+     * Examples: ['/api/v1/*', '/api/v2/*', /^\/public\/.*\/\]
      */
     includePaths?: (string | RegExp)[];
     

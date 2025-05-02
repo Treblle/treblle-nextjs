@@ -20,7 +20,8 @@ export class TreblleMiddleware implements NestMiddleware {
   }
   
   use(req: Request, res: Response, next: NextFunction): void {
-    return this.treblle.middleware()(req, res, next);
+    const middleware = this.treblle.middleware();
+    middleware(req, res, next);
   }
 }
 
@@ -61,8 +62,8 @@ export class TreblleExceptionFilter {
   
   catch(exception: Error, host: any): void {
     const ctx = host.switchToHttp();
-    const req = ctx.getRequest<Request>();
-    const res = ctx.getResponse<Response>();
+    const req = ctx.getRequest();
+    const res = ctx.getResponse();
     
     // Add to treblle errors
     if (!res._treblleErrors) {

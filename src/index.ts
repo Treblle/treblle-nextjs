@@ -14,7 +14,6 @@ import {
   calculateResponseSize, 
   extractRoutePath
 } from './utils';
-import { v4 as uuidv4 } from 'uuid';
 import https from 'https';
 
 // Constants
@@ -29,13 +28,14 @@ const TREBLLE_ENDPOINTS = [
  * @description Main SDK class for Treblle integration
  */
 class Treblle {
-  private sdkToken: string;
-  private apiKey: string;
-  private debug: boolean;
-  private maskedFields: string[];
-  private excludePaths: (string | RegExp)[];
-  private includePaths: (string | RegExp)[];
-  private enabled: boolean;
+  private sdkToken: string = '';
+  // @ts-ignore: Used in payload construction
+  private apiKey: string = ''; // Keep the original name
+  private debug: boolean = false;
+  private excludePaths: (string | RegExp)[] = [];
+  private includePaths: (string | RegExp)[] = [];
+  private enabled: boolean = true;
+  private options!: TreblleOptions; // Added to store options for use in other methods
 
   /**
    * @constructor
@@ -53,10 +53,10 @@ class Treblle {
       return;
     }
 
+    this.options = options; // Store options for later use
     this.sdkToken = options.sdkToken;
-    this.apiKey = options.apiKey;
+    this.apiKey = options.apiKey; // Keep using original name
     this.debug = options.debug || false;
-    this.maskedFields = [...options.additionalMaskedFields || []];
     
     // Initialize path filters
     this.excludePaths = options.excludePaths || [];
@@ -76,6 +76,7 @@ class Treblle {
    * @returns Express middleware function
    */
   middleware() {
+    const self = this; // Store reference to this for use in callbacks
     return (req: any, res: any, next: any) => {
       // Skip if SDK is disabled for this environment
       if (!this.enabled) {
@@ -126,7 +127,7 @@ class Treblle {
         return originalJson.apply(res, arguments);
       };
       
-      res.end = function(chunk: any, encoding: string) {
+      res.end = function(chunk: any, _encoding?: string) {
         // Calculate request duration
         const hrDuration = process.hrtime(requestStartTime);
         const duration = hrDuration[0] * 1000 + hrDuration[1] / 1000000;
@@ -171,14 +172,16 @@ class Treblle {
         const isJSON = contentType.toString().includes('application/json');
         
         // If it's a file or binary response, don't track the actual body
-        if (isFile || (typeof responseBody === 'object' && responseBody.__type === 'binary')) {
+        if (isFile || (typeof responseBody === 'object' && responseBody && 
+            '__type' in responseBody && responseBody.__type === 'binary')) {
           const contentLength = res.getHeader ? (res.getHeader('content-length') || 0) : 0;
           responseBody = {
             __type: 'file',
             size: contentLength,
             contentType: contentType
           };
-        } else if (!isJSON && typeof responseBody === 'object' && responseBody.__type === 'non-json') {
+        } else if (!isJSON && typeof responseBody === 'object' && responseBody && 
+                  '__type' in responseBody && responseBody.__type === 'non-json') {
           // For non-JSON responses, store empty object
           responseBody = {};
         }
@@ -233,7 +236,8 @@ class Treblle {
         
         // Build the payload according to Treblle specification
         const payload = {
-          api_key: this.apiKey,
+          api_key: self.sdkToken,
+          project_id: self.apiKey, // Keep using apiKey for the project_id value
           sdk: 'nodejs',
           version: '1.0.0',
           data: {
@@ -254,15 +258,15 @@ class Treblle {
               route_path: req._treblleRoutePath || '',
               user_agent: req.headers['user-agent'] || '',
               method: req.method,
-              headers: maskSensitiveData(req.headers, this.maskedFields),
-              body: maskSensitiveData(requestBody, this.maskedFields)
+              headers: maskSensitiveData(req.headers, self.options.additionalMaskedFields),
+              body: maskSensitiveData(requestBody, self.options.additionalMaskedFields)
             },
             response: {
-              headers: maskSensitiveData(responseHeaders, this.maskedFields),
+              headers: maskSensitiveData(responseHeaders, self.options.additionalMaskedFields),
               code: res.statusCode,
               size: calculateResponseSize(responseBody, res),
               load_time: duration,
-              body: maskSensitiveData(responseBody, this.maskedFields)
+              body: maskSensitiveData(responseBody, self.options.additionalMaskedFields)
             },
             errors: res._treblleErrors || []
           }
@@ -270,7 +274,7 @@ class Treblle {
         
         // Asynchronously send data to Treblle (fire and forget)
         setImmediate(() => {
-          this._sendPayload(payload);
+          self._sendPayload(payload);
         });
         
         return originalEnd.apply(res, arguments);
@@ -287,7 +291,7 @@ class Treblle {
    * @returns Express error middleware function
    */
   errorHandler() {
-    return (err: Error, req: any, res: any, next: any) => {
+    return (err: Error, _req: any, res: any, next: any) => {
       // Skip if SDK is disabled for this environment
       if (!this.enabled) {
         return next(err);
@@ -348,9 +352,10 @@ class Treblle {
           break;
         }
       }
-    } catch (e) {
+    } catch (e: unknown) {
       // If parsing fails, use the default values
-      this._handleError(new Error(`Error parsing stack trace: ${e.message}`));
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      this._handleError(new Error(`Error parsing stack trace: ${errorMessage}`));
     }
     
     return errorInfo;
@@ -362,7 +367,7 @@ class Treblle {
    * @description Send payload to a random Treblle endpoint
    * @param payload - The payload to send
    */
-  private _sendPayload(payload: any) {
+  private _sendPayload(payload: any): void {
     try {
       // Select random endpoint
       const endpoint = TREBLLE_ENDPOINTS[Math.floor(Math.random() * TREBLLE_ENDPOINTS.length)];
@@ -395,7 +400,7 @@ class Treblle {
       });
       
       // Handle request errors silently
-      req.on('error', (error) => {
+      req.on('error', (error: Error) => {
         this._handleError(error);
       });
       
@@ -408,8 +413,12 @@ class Treblle {
       // Send data
       req.write(JSON.stringify(payload));
       req.end();
-    } catch (error) {
-      this._handleError(error);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this._handleError(error);
+      } else {
+        this._handleError(new Error(`Unknown error: ${String(error)}`));
+      }
     }
   }
 

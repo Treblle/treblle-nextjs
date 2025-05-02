@@ -3,7 +3,7 @@
  * @description Express framework integration for Treblle SDK
  */
 
-import { Request, Response, NextFunction, RequestHandler, ErrorRequestHandler } from 'express';
+import { RequestHandler, ErrorRequestHandler } from 'express';
 import Treblle from '../index';
 import { TreblleOptions } from '../types';
 
@@ -46,13 +46,14 @@ export function configureTreblle(app: any, options: TreblleOptions): void {
 /**
  * Helper function to apply Treblle to specific routes
  * @param options - Treblle configuration options
- * @param routes - Express router or app instance
+ * @returns RequestHandler middleware
  */
-export function applyTreblleToRoutes(options: TreblleOptions, routes: any): RequestHandler {
+export function applyTreblleToRoutes(options: TreblleOptions): RequestHandler {
   const treblle = new Treblle(options);
   return treblle.middleware() as RequestHandler;
 }
 
+// Default export with all Express integration functions
 export default {
   createTreblleMiddleware,
   createTreblleErrorHandler,
