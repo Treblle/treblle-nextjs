@@ -118,11 +118,13 @@ class Treblle {
       
       // Override response methods to capture data
       res.send = function(body: any) {
+        // Store body directly, will be processed later
         responseBody = body;
         return originalSend.apply(res, arguments);
       };
       
       res.json = function(body: any) {
+        // For json responses, store the raw object directly
         responseBody = body;
         return originalJson.apply(res, arguments);
       };
@@ -137,7 +139,13 @@ class Treblle {
           try {
             // Try to parse as JSON
             if (typeof chunk === 'string') {
-              responseBody = JSON.parse(chunk);
+              try {
+                // Parse string to get actual object
+                responseBody = JSON.parse(chunk);
+              } catch (e) {
+                // If it's not valid JSON, keep as string
+                responseBody = { __type: 'text', content: chunk };
+              }
             } else if (Buffer.isBuffer(chunk)) {
               // Try to parse buffer as JSON
               try {
@@ -148,6 +156,7 @@ class Treblle {
                 responseBody = { __type: 'binary', size: chunk.length };
               }
             } else if (typeof chunk === 'object') {
+              // If it's already an object, use it directly - don't stringify
               responseBody = chunk;
             }
           } catch (e) {
@@ -249,7 +258,11 @@ class Treblle {
                 release: process.release.name,
                 architecture: process.arch
               },
-              software: process.version
+              software: process.version,
+              language: {
+                name: "nodejs",
+                version: process.version
+              }
             },
             request: {
               timestamp: requestTimestamp,
@@ -410,8 +423,31 @@ class Treblle {
         this._handleError(new Error('Treblle request timeout'));
       });
       
-      // Send data
-      req.write(JSON.stringify(payload));
+      // Helper function to ensure proper JSON formatting
+      const safeStringify = (obj: any): string => {
+        return JSON.stringify(obj, (_key, value) => {
+          // If the value is already a string that looks like JSON, parse it 
+          // to prevent double-escaping
+          if (typeof value === 'string') {
+            try {
+              // Check if this string appears to be JSON
+              if ((value.startsWith('{') && value.endsWith('}')) || 
+                  (value.startsWith('[') && value.endsWith(']'))) {
+                // Try to parse it
+                const parsed = JSON.parse(value);
+                // If successful, return the parsed object instead of the string
+                return parsed;
+              }
+            } catch (e) {
+              // Not valid JSON, leave as string
+            }
+          }
+          return value;
+        });
+      };
+      
+      // Send data with better JSON handling
+      req.write(safeStringify(payload));
       req.end();
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -507,4 +543,7 @@ class Treblle {
   }
 }
 
+// Export the Treblle class as the default export AND as a named export
+// This allows users to import it in multiple ways
+export { Treblle };
 export default Treblle;

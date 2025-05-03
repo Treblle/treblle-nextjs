@@ -4,7 +4,6 @@
  */
 
 import { maskSensitiveData } from '../src/masking';
-import { DEFAULT_MASKED_FIELDS } from '../src/types';
 
 describe('Data Masking', () => {
   test('should mask sensitive fields', () => {

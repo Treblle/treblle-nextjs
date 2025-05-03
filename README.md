@@ -21,16 +21,22 @@ Official Treblle SDK for NodeJS applications. Monitor API requests in real-time 
 ## Installation
 
 ```bash
-npm install treblle-sdk --save
+npm install treblle-js --save
 ```
 
 ## Quick Start
 
 ```javascript
 const express = require('express');
-const Treblle = require('treblle-sdk');
+const Treblle = require('treblle-js');
 
-// Initialize Treblle
+const app = express();
+
+// Parse JSON and URL-encoded bodies FIRST
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Initialize Treblle AFTER body parsers
 const treblle = new Treblle({
   sdkToken: 'YOUR_SDK_TOKEN',
   apiKey: 'YOUR_API_KEY',
@@ -42,24 +48,52 @@ const treblle = new Treblle({
   }
 });
 
-const app = express();
-
-// Parse JSON bodies
-app.use(express.json());
-
-// Enable Treblle middleware on all routes
+// Enable Treblle middleware on all routes AFTER body parsers
 app.use(treblle.middleware());
 
-// Or enable it only on specific routes
-app.use('/api/v1', treblle.middleware(), apiRoutes);
+// Your routes and other middleware here
+app.get('/api/users', (req, res) => {
+  // API logic
+});
 
 // Add Treblle error handler (before your own error handler)
 app.use(treblle.errorHandler());
+
+// Your application's error handler comes after
+app.use((err, req, res, next) => {
+  res.status(500).json({ error: 'Server error' });
+});
 
 app.listen(3000, () => {
   console.log('Server running on port 3000');
 });
 ```
+
+## Important: Middleware Order in Express
+
+When using Treblle with Express, **the order of middleware registration is critical**:
+
+1. **Body Parsers First**: Always register Express body parsing middleware (`express.json()` and `express.urlencoded()`) BEFORE the Treblle middleware.
+
+2. **Treblle Middleware After**: Add the Treblle middleware AFTER body parsers but BEFORE your route handlers.
+
+3. **Treblle Error Handler Last**: Add the Treblle error handler after your routes but before your application's error handler.
+
+### ❌ Incorrect Order (Will Not Capture Request Bodies)
+
+```javascript
+app.use(treblle.middleware());   // TOO EARLY!
+app.use(express.json());         // Body parser after Treblle can't be captured
+```
+
+### ✅ Correct Order
+
+```javascript
+app.use(express.json());         // Parse request bodies first
+app.use(treblle.middleware());   // Now Treblle can capture the parsed body
+```
+
+Following this order ensures that Treblle can properly capture and monitor your API's request and response bodies, providing accurate data in your Treblle dashboard.
 
 ## Configuration Options
 
@@ -249,7 +283,7 @@ The SDK can automatically capture and report detailed information about errors t
 
 ```javascript
 const express = require('express');
-const Treblle = require('treblle-sdk');
+const Treblle = require('treblle-js');
 
 const app = express();
 const treblle = new Treblle({
@@ -477,4 +511,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Support
 
-If you have any questions or issues, please [open an issue](https://github.com/treblle/treblle-sdk-nodejs/issues) or contact the Treblle team.
+If you have any questions or issues, please [open an issue](https://github.com/Treblle/treblle-js/issues) or contact the Treblle team.
