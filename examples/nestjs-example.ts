@@ -3,10 +3,10 @@
  * @description Example using Treblle SDK with NestJS
  */
 
-import { Module, NestModule, MiddlewareConsumer, Controller, Get, Post, Body, UseFilters, HttpStatus } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer, Controller, Get, Post, Body, UseFilters, UseInterceptors } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { Request, Response } from 'express';
-import { nestjs as treblleNestJS } from '../src/integrations'; // In your project, use 'treblle-sdk/integrations'
+import * as express from 'express';
+import { nestjs as treblleNestJS } from '../src/integrations'; // In your project, use 'treblle-js/integrations'
 
 // Configuration for Treblle
 const treblleOptions = {
@@ -25,12 +25,14 @@ class LoginDto {
   password: string;
 }
 
-// Create the Treblle exception filter
-const treblleExceptionFilter = new treblleNestJS.TreblleExceptionFilter(treblleOptions);
+//============================================================================
+// Example 1: Recommended approach - Module registration with middleware chaining
+//============================================================================
 
 // Controller with sample endpoints
 @Controller('api')
-@UseFilters(treblleExceptionFilter)
+@UseFilters(treblleNestJS.TreblleExceptionFilter) // Will use the shared instance from the module
+@UseInterceptors(treblleNestJS.TreblleInterceptor) // Will use the shared instance from the module
 class ApiController {
   @Get('users')
   getUsers() {
@@ -78,18 +80,54 @@ class ApiController {
 // Register the Treblle module
 @Module({
   imports: [
-    treblleNestJS.TreblleModule.register(treblleOptions)
+    treblleNestJS.TreblleModule.register(treblleOptions) // All components share the same Treblle instance
   ],
   controllers: [ApiController]
 })
 class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    // Apply Treblle middleware to all routes
+    // Apply body parsers and Treblle middleware in the correct order
     consumer
-      .apply(treblleNestJS.TreblleMiddleware)
+      .apply(
+        express.json(), 
+        express.urlencoded({ extended: true }), 
+        treblleNestJS.TreblleMiddleware
+      )
       .forRoutes('*');
   }
 }
+
+//============================================================================
+// Example 2: Alternative approach - Manual setup in bootstrap
+//============================================================================
+// 
+// @Module({
+//   imports: [treblleNestJS.TreblleModule.register(treblleOptions)],
+//   controllers: [ApiController]
+// })
+// class AppModule {}
+// 
+// async function bootstrap() {
+//   const app = await NestFactory.create(AppModule);
+//   
+//   // Apply body parsers first
+//   app.use(express.json());
+//   app.use(express.urlencoded({ extended: true }));
+//   
+//   // Apply treblle middleware after body parsers
+//   const treblleMiddleware = app.get(treblleNestJS.TreblleMiddleware);
+//   app.use(treblleMiddleware.use.bind(treblleMiddleware));
+//   
+//   // Apply global exception filter
+//   const treblleExceptionFilter = app.get(treblleNestJS.TreblleExceptionFilter);
+//   app.useGlobalFilters(treblleExceptionFilter);
+//   
+//   // Apply global interceptor
+//   const treblleInterceptor = app.get(treblleNestJS.TreblleInterceptor);
+//   app.useGlobalInterceptors(treblleInterceptor);
+//   
+//   await app.listen(3000);
+// }
 
 // Bootstrap the application
 async function bootstrap() {

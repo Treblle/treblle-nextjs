@@ -3,16 +3,17 @@
  * @description Exports all framework integrations
  */
 
-// Export Express integration functions
-import * as expressIntegration from './express';
-export const express = expressIntegration;
+// Import Express integration directly
+import expressIntegration from './express';
+// Import NestJS integration directly
+import nestjsIntegration from './nestjs';
 
-// Export NestJS integration components
-import * as nestjsIntegration from './nestjs';
+// Named exports for each integration
+export const express = expressIntegration;
 export const nestjs = nestjsIntegration;
 
 // Default export with all integrations
 export default {
-  express,
-  nestjs
+  express: expressIntegration,
+  nestjs: nestjsIntegration
 };

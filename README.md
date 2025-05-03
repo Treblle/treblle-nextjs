@@ -26,6 +26,56 @@ npm install treblle-js --save
 
 ## Quick Start
 
+### Using the Express Integration (Recommended)
+
+The Express integration provides a simplified way to use Treblle with shared configuration between middleware and error handler.
+
+```javascript
+const express = require('express');
+const { express: treblleExpress } = require('treblle-js').integrations;
+
+const app = express();
+
+// Parse JSON and URL-encoded bodies FIRST
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Define Treblle options
+const treblleOptions = {
+  sdkToken: 'YOUR_SDK_TOKEN',
+  apiKey: 'YOUR_API_KEY',
+  additionalMaskedFields: ['custom_field_to_mask'],
+  debug: false, // set to true to see errors in console
+  environments: {
+    // Disable in test environment
+    disabled: ['test']
+  }
+};
+
+// Add Treblle middleware
+app.use(treblleExpress.createTreblleMiddleware(treblleOptions));
+
+// Your routes and other middleware here
+app.get('/api/users', (req, res) => {
+  // API logic
+});
+
+// Add Treblle error handler WITHOUT needing to pass config again
+// The error handler will use the same Treblle instance as the middleware
+app.use(treblleExpress.createTreblleErrorHandler());
+
+// Your application's error handler comes after
+app.use((err, req, res, next) => {
+  res.status(500).json({ error: 'Server error' });
+});
+
+app.listen(3000, () => {
+  console.log('Server running on port 3000');
+});
+```
+
+### Using the Treblle Class Directly (Alternative)
+
 ```javascript
 const express = require('express');
 const Treblle = require('treblle-js');
@@ -280,6 +330,40 @@ This gives you accurate endpoint grouping with zero configuration required.
 The SDK can automatically capture and report detailed information about errors that occur in your API:
 
 ### Using the Error Handler Middleware
+
+#### Express Integration (Recommended)
+
+```javascript
+const express = require('express');
+const { express: treblleExpress } = require('treblle-js').integrations;
+
+const app = express();
+
+// Configure Treblle once
+const treblleOptions = {
+  sdkToken: 'YOUR_SDK_TOKEN',
+  apiKey: 'YOUR_API_KEY'
+};
+
+// Apply the regular Treblle middleware
+app.use(treblleExpress.createTreblleMiddleware(treblleOptions));
+
+// Your routes and other middleware here
+app.get('/api/users', (req, res) => {
+  // API logic
+});
+
+// Add the Treblle error handler WITHOUT passing options again
+// It automatically uses the same instance as the middleware
+app.use(treblleExpress.createTreblleErrorHandler());
+
+// Your application's error handler comes after
+app.use((err, req, res, next) => {
+  res.status(500).json({ error: 'Server error' });
+});
+```
+
+#### Using the Treblle Class Directly
 
 ```javascript
 const express = require('express');

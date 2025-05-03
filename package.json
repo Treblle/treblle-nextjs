@@ -8,8 +8,13 @@
   "exports": {
     ".": {
       "require": "./module-wrapper.js",
-      "import": "./dist/esm/index.js",
+      "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./integrations": {
+      "require": "./dist/integrations/index.js",
+      "import": "./dist/integrations/index.js",
+      "types": "./dist/integrations/index.d.ts"
     }
   },
   "scripts": {

@@ -6,9 +6,11 @@
 import express from 'express';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
+// Example 1: Using the Treblle class directly
 import Treblle from '../src'; // In your project, use 'treblle-sdk'
-// Alternatively, you can use the Express integration directly:
-// import { express as treblleExpress } from '../src/integrations';
+
+// Example 2: Using the Express integration (recommended approach)
+import { express as treblleExpress } from '../src/integrations';
 
 // Load environment variables
 dotenv.config();
@@ -20,8 +22,8 @@ const app = express();
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Initialize Treblle
-const treblle = new Treblle({
+// Configure Treblle options
+const treblleOptions = {
   sdkToken: process.env.TREBLLE_SDK_TOKEN || 'YOUR_SDK_TOKEN',
   apiKey: process.env.TREBLLE_API_KEY || 'YOUR_API_KEY',
   additionalMaskedFields: ['custom_field'], // Optional custom fields to mask
@@ -37,10 +39,19 @@ const treblle = new Treblle({
   environments: {
     disabled: ['test']
   }
-});
+};
 
-// Enable Treblle request middleware globally
-app.use(treblle.middleware());
+// Example 1: Using Treblle class directly
+// ----------------------------------------
+// const treblle = new Treblle(treblleOptions);
+// app.use(treblle.middleware());
+// ...later in the middleware chain...
+// app.use(treblle.errorHandler());
+
+// Example 2: Using Express integration (recommended)
+// -------------------------------------------------
+// Create middleware - this will register the Treblle instance for later use
+app.use(treblleExpress.createTreblleMiddleware(treblleOptions));
 
 // Sample API routes
 app.get('/api/users', (req, res) => {
@@ -89,9 +100,10 @@ app.get('/api/runtime-error', (req, res) => {
   res.json({ result: undefinedVariable.property });
 });
 
-// Use Treblle error handler middleware
+// Use Treblle error handler middleware WITHOUT having to pass options again
+// This will reuse the instance created by createTreblleMiddleware
 // IMPORTANT: This must be before your application's error handler
-app.use(treblle.errorHandler());
+app.use(treblleExpress.createTreblleErrorHandler());
 
 // Application error handler
 app.use((err, req, res, next) => {
@@ -101,6 +113,17 @@ app.use((err, req, res, next) => {
     error: 'Internal Server Error'
   });
 });
+
+// Example 3: Using the all-in-one configuration (alternative)
+// -----------------------------------------------------------
+// Instead of the separate middleware and error handler, you can use:
+// treblleExpress.configureTreblle(app, treblleOptions);
+
+// Example 4: Class-based middleware pattern (alternative)
+// ------------------------------------------------------
+// const middleware = new treblleExpress.TreblleMiddleware(treblleOptions);
+// app.use((req, res, next) => middleware.use(req, res, next));
+// app.use((err, req, res, next) => middleware.handleError(err, req, res, next));
 
 // Start server
 const PORT = process.env.PORT || 3000;

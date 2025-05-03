@@ -23,6 +23,10 @@ const TREBLLE_ENDPOINTS = [
   'https://sicario.treblle.com'
 ];
 
+// Import integrations for re-export
+import * as expressIntegration from './integrations/express';
+import * as nestjsIntegration from './integrations/nestjs';
+
 /**
  * @class Treblle
  * @description Main SDK class for Treblle integration
@@ -30,12 +34,12 @@ const TREBLLE_ENDPOINTS = [
 class Treblle {
   private sdkToken: string = '';
   // @ts-ignore: Used in payload construction
-  private apiKey: string = ''; // Keep the original name
+  private apiKey: string = '';
   private debug: boolean = false;
   private excludePaths: (string | RegExp)[] = [];
   private includePaths: (string | RegExp)[] = [];
   private enabled: boolean = true;
-  private options!: TreblleOptions; // Added to store options for use in other methods
+  private options!: TreblleOptions;
 
   /**
    * @constructor
@@ -55,7 +59,7 @@ class Treblle {
 
     this.options = options; // Store options for later use
     this.sdkToken = options.sdkToken;
-    this.apiKey = options.apiKey; // Keep using original name
+    this.apiKey = options.apiKey;
     this.debug = options.debug || false;
     
     // Initialize path filters
@@ -132,7 +136,8 @@ class Treblle {
       res.end = function(chunk: any, _encoding?: string) {
         // Calculate request duration
         const hrDuration = process.hrtime(requestStartTime);
-        const duration = hrDuration[0] * 1000 + hrDuration[1] / 1000000;
+        //const duration = hrDuration[0] * 1000 + hrDuration[1] / 1000000; // Convert to milliseconds
+        const duration = hrDuration[0] * 1000000 + hrDuration[1] / 1000; // Convert to microseconds
         
         // Process response body
         if (chunk && typeof chunk !== 'function' && Object.keys(responseBody).length === 0) {
@@ -246,7 +251,7 @@ class Treblle {
         // Build the payload according to Treblle specification
         const payload = {
           api_key: self.sdkToken,
-          project_id: self.apiKey, // Keep using apiKey for the project_id value
+          project_id: self.apiKey,
           sdk: 'nodejs',
           version: '1.0.0',
           data: {
@@ -543,7 +548,16 @@ class Treblle {
   }
 }
 
-// Export the Treblle class as the default export AND as a named export
-// This allows users to import it in multiple ways
+// Export integrations directly as named exports
+export const express = expressIntegration;
+export const nestjs = nestjsIntegration;
+
+// Export the integrations object for backwards compatibility
+export const integrations = {
+  express: expressIntegration,
+  nestjs: nestjsIntegration
+};
+
+// Export the Treblle class as both default and named export
 export { Treblle };
 export default Treblle;
