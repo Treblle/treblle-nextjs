@@ -3,17 +3,19 @@
  * @description Exports all framework integrations
  */
 
-// Import Express integration directly
+// Import integrations
 import expressIntegration from './express';
-// Import NestJS integration directly
 import nestjsIntegration from './nestjs';
+import { TreblleInstanceManager } from './instance-manager';
 
 // Named exports for each integration
 export const express = expressIntegration;
 export const nestjs = nestjsIntegration;
+export const instanceManager = TreblleInstanceManager;
 
 // Default export with all integrations
 export default {
   express: expressIntegration,
-  nestjs: nestjsIntegration
+  nestjs: nestjsIntegration,
+  instanceManager: TreblleInstanceManager
 };

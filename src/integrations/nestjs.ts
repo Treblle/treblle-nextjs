@@ -9,65 +9,7 @@ import Treblle from '../index';
 import { TreblleOptions } from '../types';
 import { Observable, throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
-
-// Store instances by config hash to avoid creating duplicate instances
-const instances = new Map<string, Treblle>();
-// Default instance for components that don't receive options
-let defaultInstance: Treblle | null = null;
-
-/**
- * Helper to get or create a Treblle instance based on config
- * @param options - Treblle configuration options
- * @returns Treblle instance
- */
-function getTreblleInstance(options: TreblleOptions): Treblle {
-  // Create a simple hash of the options object
-  const hash = JSON.stringify({
-    sdkToken: options.sdkToken,
-    apiKey: options.apiKey,
-    debug: options.debug,
-    enabled: options.enabled,
-    environments: options.environments,
-    additionalMaskedFields: options.additionalMaskedFields,
-    excludePaths: options.excludePaths,
-    includePaths: options.includePaths
-  });
-  
-  if (options.debug) {
-    console.log(`[Treblle SDK] NestJS: Getting Treblle instance with hash ${hash.substring(0, 20)}...`);
-    console.log(`[Treblle SDK] NestJS: Instance exists: ${instances.has(hash)}`);
-  }
-  
-  // Check if we already have an instance with these options
-  if (!instances.has(hash)) {
-    if (options.debug) {
-      console.log(`[Treblle SDK] NestJS: Creating new Treblle instance`);
-    }
-    const instance = new Treblle(options);
-    instances.set(hash, instance);
-    
-    // Set as default instance if we don't have one yet
-    if (!defaultInstance) {
-      defaultInstance = instance;
-      if (options.debug) {
-        console.log(`[Treblle SDK] NestJS: Set as default instance`);
-      }
-    }
-  }
-  
-  return instances.get(hash)!;
-}
-
-/**
- * Get the default Treblle instance, or throw if none exists
- * @returns The default Treblle instance
- */
-function getDefaultInstance(): Treblle {
-  if (!defaultInstance) {
-    throw new Error('No Treblle instance found. Create middleware with options first or provide options directly.');
-  }
-  return defaultInstance;
-}
+import { TreblleInstanceManager } from './instance-manager';
 
 /**
  * Treblle middleware for NestJS
@@ -81,11 +23,11 @@ export class TreblleMiddleware implements NestMiddleware {
     // If options provided directly, use them
     // Otherwise use default instance which should be set during module registration
     if (options) {
-      this.treblle = getTreblleInstance(options);
+      this.treblle = TreblleInstanceManager.getInstance(options, 'NestJS');
       this.debug = options.debug || false;
     } else {
       // Get the default instance that was created during module registration
-      this.treblle = getDefaultInstance();
+      this.treblle = TreblleInstanceManager.getDefaultInstance('NestJS');
       this.debug = this.treblle.options?.debug || false;
     }
     
@@ -125,7 +67,7 @@ export class TreblleModule {
    */
   static register(options: TreblleOptions): DynamicModule {
     // Ensure Treblle instance is created and cached
-    getTreblleInstance(options);
+    TreblleInstanceManager.getInstance(options, 'NestJS');
     
     return {
       module: TreblleModule,
@@ -159,7 +101,7 @@ export class TreblleModule {
    * @returns Middleware function
    */
   static createMiddleware(options: TreblleOptions): (req: Request, res: Response, next: NextFunction) => void {
-    const treblleInstance = getTreblleInstance(options);
+    const treblleInstance = TreblleInstanceManager.getInstance(options, 'NestJS');
     const middleware = treblleInstance.middleware();
     
     return (req: Request, res: Response, next: NextFunction) => {
@@ -196,9 +138,9 @@ export class TreblleExceptionFilter {
   
   constructor(options?: TreblleOptions) {
     if (options) {
-      this.treblle = getTreblleInstance(options);
+      this.treblle = TreblleInstanceManager.getInstance(options, 'NestJS');
     } else {
-      this.treblle = getDefaultInstance();
+      this.treblle = TreblleInstanceManager.getDefaultInstance('NestJS');
     }
   }
   
@@ -238,9 +180,9 @@ export class TreblleInterceptor implements NestInterceptor {
 
   constructor(options?: TreblleOptions) {
     if (options) {
-      this.treblle = getTreblleInstance(options);
+      this.treblle = TreblleInstanceManager.getInstance(options, 'NestJS');
     } else {
-      this.treblle = getDefaultInstance();
+      this.treblle = TreblleInstanceManager.getDefaultInstance('NestJS');
     }
   }
 

@@ -4,6 +4,7 @@
  */
 
 import { DEFAULT_MASKED_FIELDS } from './types';
+import { isFileObject, createFileMetadata, BinaryType } from './binary-handler';
 
 /**
  * @function maskSensitiveData
@@ -22,7 +23,7 @@ export function maskSensitiveData(data: any, additionalFields: string[] = []): a
   
   // Handle Buffer or binary data
   if (Buffer.isBuffer(data)) {
-    return { __type: 'binary', size: data.length };
+    return { __type: BinaryType.Binary, size: data.length };
   }
   
   // Function to determine if an object is too large or complex to process
@@ -40,7 +41,7 @@ export function maskSensitiveData(data: any, additionalFields: string[] = []): a
   // Check payload size before processing
   if (isLargeObject(data)) {
     // Return a placeholder for large objects
-    return { __type: 'large_object', message: 'Object too large to process' };
+    return { __type: BinaryType.LargeObject, message: 'Object too large to process' };
   }
   
   // Create a deep copy to avoid modifying original
@@ -49,7 +50,7 @@ export function maskSensitiveData(data: any, additionalFields: string[] = []): a
     maskedData = JSON.parse(JSON.stringify(data));
   } catch (e) {
     // If we can't clone the object, return a simplified representation
-    return { __type: 'unprocessable', message: 'Unable to process object' };
+    return { __type: BinaryType.Unprocessable, message: 'Unable to process object' };
   }
   
   // Process object recursively
@@ -63,23 +64,9 @@ export function maskSensitiveData(data: any, additionalFields: string[] = []): a
         continue;
       }
       
-      // Check if key or value indicates a file
-      const isFileKey = ['file', 'files', 'buffer', 'image', 'document', 'attachment', 'upload']
-        .includes(key.toLowerCase());
-        
-      const isFileObj = obj[key] && typeof obj[key] === 'object' && 
-                       (obj[key].buffer || obj[key].data || obj[key].path) && 
-                       (obj[key].mimetype || obj[key].type || obj[key].filename || obj[key].originalname);
-      
-      // Handle file objects
-      if (isFileKey && isFileObj) {
-        const fileObj = obj[key];
-        obj[key] = {
-          __type: 'file',
-          filename: fileObj.originalname || fileObj.filename || 'unknown',
-          size: fileObj.size || (fileObj.buffer ? fileObj.buffer.length : 0) || 0,
-          mimetype: fileObj.mimetype || fileObj.type || 'application/octet-stream'
-        };
+      // Check if the object is a file and handle it
+      if (isFileObject(obj[key], key)) {
+        obj[key] = createFileMetadata(obj[key]);
         continue;
       }
       

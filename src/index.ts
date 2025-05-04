@@ -15,6 +15,7 @@ import {
   extractRoutePath
 } from './utils';
 import https from 'https';
+import * as binaryHandler from './binary-handler';
 
 // Constants
 const TREBLLE_ENDPOINTS = [
@@ -117,8 +118,11 @@ class Treblle {
       const originalEnd = res.end;
       
       // Store request body
+      // Clone request body to avoid modifying the original
       const requestBody = { ...req.body };
       let responseBody = {};
+      
+      // Use binary handler imported at the top of the file
       
       // Override response methods to capture data
       res.send = function(body: any) {
@@ -136,108 +140,28 @@ class Treblle {
       res.end = function(chunk: any, _encoding?: string) {
         // Calculate request duration
         const hrDuration = process.hrtime(requestStartTime);
-        //const duration = hrDuration[0] * 1000 + hrDuration[1] / 1000000; // Convert to milliseconds
         const duration = hrDuration[0] * 1000000 + hrDuration[1] / 1000; // Convert to microseconds
         
-        // Process response body
-        if (chunk && typeof chunk !== 'function' && Object.keys(responseBody).length === 0) {
-          try {
-            // Try to parse as JSON
-            if (typeof chunk === 'string') {
-              try {
-                // Parse string to get actual object
-                responseBody = JSON.parse(chunk);
-              } catch (e) {
-                // If it's not valid JSON, keep as string
-                responseBody = { __type: 'text', content: chunk };
-              }
-            } else if (Buffer.isBuffer(chunk)) {
-              // Try to parse buffer as JSON
-              try {
-                const stringChunk = chunk.toString('utf8');
-                responseBody = JSON.parse(stringChunk);
-              } catch (e) {
-                // Not JSON, mark as binary
-                responseBody = { __type: 'binary', size: chunk.length };
-              }
-            } else if (typeof chunk === 'object') {
-              // If it's already an object, use it directly - don't stringify
-              responseBody = chunk;
-            }
-          } catch (e) {
-            // Not valid JSON, use empty object
-            responseBody = { __type: 'non-json' };
-          }
-        }
-        
-        // Check if response is a file or large binary data
+        // Get response headers for content type detection
         const contentType = res.getHeader ? (res.getHeader('content-type') || '') : '';
         const contentDisposition = res.getHeader ? (res.getHeader('content-disposition') || '') : '';
+        const contentLength = res.getHeader ? (res.getHeader('content-length') || 0) : 0;
         
-        // Check if response is a file or non-JSON content
-        const isFile = contentDisposition.toString().includes('attachment') || 
-                      contentDisposition.toString().includes('filename') ||
-                      contentType.toString().includes('application/octet-stream') ||
-                      contentType.toString().includes('application/pdf') ||
-                      contentType.toString().includes('image/') ||
-                      contentType.toString().includes('audio/') ||
-                      contentType.toString().includes('video/');
-                      
-        const isJSON = contentType.toString().includes('application/json');
-        
-        // If it's a file or binary response, don't track the actual body
-        if (isFile || (typeof responseBody === 'object' && responseBody && 
-            '__type' in responseBody && responseBody.__type === 'binary')) {
-          const contentLength = res.getHeader ? (res.getHeader('content-length') || 0) : 0;
-          responseBody = {
-            __type: 'file',
-            size: contentLength,
-            contentType: contentType
-          };
-        } else if (!isJSON && typeof responseBody === 'object' && responseBody && 
-                  '__type' in responseBody && responseBody.__type === 'non-json') {
-          // For non-JSON responses, store empty object
-          responseBody = {};
+        // Process response body if we have a chunk and no body was stored via send/json
+        if (chunk && typeof chunk !== 'function' && Object.keys(responseBody).length === 0) {
+          responseBody = binaryHandler.processResponseBody(
+            chunk, 
+            contentType, 
+            contentDisposition, 
+            contentLength
+          );
         }
         
-        // Check request body for files and handle appropriately
+        // Process any file uploads in the request body
         if (req.files || (req.file && req.file.buffer)) {
-          const processedRequestBody = { ...requestBody };
-          
-          // Handle multer single file upload
-          if (req.file && req.file.buffer) {
-            processedRequestBody[req.file.fieldname] = {
-              __type: 'file',
-              filename: req.file.originalname,
-              size: req.file.size,
-              mimetype: req.file.mimetype
-            };
-          }
-          
-          // Handle multer multiple file upload
-          if (req.files) {
-            Object.keys(req.files).forEach(fieldname => {
-              const files = req.files[fieldname];
-              if (Array.isArray(files)) {
-                processedRequestBody[fieldname] = files.map(file => ({
-                  __type: 'file',
-                  filename: file.originalname,
-                  size: file.size,
-                  mimetype: file.mimetype
-                }));
-              } else {
-                processedRequestBody[fieldname] = {
-                  __type: 'file',
-                  filename: files.originalname,
-                  size: files.size,
-                  mimetype: files.mimetype
-                };
-              }
-            });
-          }
-          
-          // Update request body with processed version
-          Object.assign(requestBody, processedRequestBody);
+          // Use the binary handler to process request files
+          const processedBody = binaryHandler.processRequestFiles(req, requestBody);
+          Object.assign(requestBody, processedBody);
         }
         
         // Get response headers
