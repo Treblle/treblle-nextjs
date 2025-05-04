@@ -33,14 +33,25 @@ function getTreblleInstance(options: TreblleOptions): Treblle {
     includePaths: options.includePaths
   });
   
+  if (options.debug) {
+    console.log(`[Treblle SDK] NestJS: Getting Treblle instance with hash ${hash.substring(0, 20)}...`);
+    console.log(`[Treblle SDK] NestJS: Instance exists: ${instances.has(hash)}`);
+  }
+  
   // Check if we already have an instance with these options
   if (!instances.has(hash)) {
+    if (options.debug) {
+      console.log(`[Treblle SDK] NestJS: Creating new Treblle instance`);
+    }
     const instance = new Treblle(options);
     instances.set(hash, instance);
     
     // Set as default instance if we don't have one yet
     if (!defaultInstance) {
       defaultInstance = instance;
+      if (options.debug) {
+        console.log(`[Treblle SDK] NestJS: Set as default instance`);
+      }
     }
   }
   
@@ -64,14 +75,41 @@ function getDefaultInstance(): Treblle {
 @Injectable()
 export class TreblleMiddleware implements NestMiddleware {
   private treblle: Treblle;
+  private debug: boolean;
   
-  constructor(options: TreblleOptions) {
-    this.treblle = getTreblleInstance(options);
+  constructor(options?: TreblleOptions) {
+    // If options provided directly, use them
+    // Otherwise use default instance which should be set during module registration
+    if (options) {
+      this.treblle = getTreblleInstance(options);
+      this.debug = options.debug || false;
+    } else {
+      // Get the default instance that was created during module registration
+      this.treblle = getDefaultInstance();
+      this.debug = this.treblle.options?.debug || false;
+    }
+    
+    if (this.debug) {
+      console.log(`[Treblle SDK] NestJS: TreblleMiddleware initialized`);
+    }
   }
   
   use(req: Request, res: Response, next: NextFunction): void {
+    if (this.debug) {
+      console.log(`[Treblle SDK] NestJS: Middleware executing for ${req.method} ${req.url}`);
+    }
+    
     const middleware = this.treblle.middleware();
+    
+    if (this.debug) {
+      console.log(`[Treblle SDK] NestJS: Middleware obtained, now executing it`);
+    }
+    
     middleware(req, res, next);
+    
+    if (this.debug) {
+      console.log(`[Treblle SDK] NestJS: Middleware passed control to next middleware`);
+    }
   }
 }
 
@@ -93,6 +131,10 @@ export class TreblleModule {
       module: TreblleModule,
       providers: [
         {
+          provide: 'TREBLLE_OPTIONS',
+          useValue: options,
+        },
+        {
           provide: TreblleMiddleware,
           useFactory: () => new TreblleMiddleware(options),
         },
@@ -107,6 +149,24 @@ export class TreblleModule {
       ],
       exports: [TreblleMiddleware, TreblleExceptionFilter, TreblleInterceptor],
       global: true, // Make the module global so components are available everywhere
+    };
+  }
+  
+  /**
+   * Creates a functional middleware that can be directly used with NestJS
+   * consumer.apply() without dependency injection
+   * @param options Treblle options
+   * @returns Middleware function
+   */
+  static createMiddleware(options: TreblleOptions): (req: Request, res: Response, next: NextFunction) => void {
+    const treblleInstance = getTreblleInstance(options);
+    const middleware = treblleInstance.middleware();
+    
+    return (req: Request, res: Response, next: NextFunction) => {
+      if (options.debug) {
+        console.log(`[Treblle SDK] NestJS: Function middleware executing for ${req.method} ${req.url}`);
+      }
+      middleware(req, res, next);
     };
   }
 
@@ -243,5 +303,6 @@ export default {
   TreblleMiddleware,
   TreblleModule,
   TreblleExceptionFilter,
-  TreblleInterceptor
+  TreblleInterceptor,
+  createMiddleware: TreblleModule.createMiddleware
 };

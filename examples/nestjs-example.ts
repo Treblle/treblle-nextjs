@@ -29,10 +29,13 @@ class LoginDto {
 // Example 1: Recommended approach - Module registration with middleware chaining
 //============================================================================
 
+// Import the class types directly for proper TypeScript type resolution
+const { TreblleExceptionFilter, TreblleInterceptor } = treblleNestJS;
+
 // Controller with sample endpoints
 @Controller('api')
-@UseFilters(treblleNestJS.TreblleExceptionFilter) // Will use the shared instance from the module
-@UseInterceptors(treblleNestJS.TreblleInterceptor) // Will use the shared instance from the module
+@UseFilters(new TreblleExceptionFilter(treblleOptions)) // Use an instance with options
+@UseInterceptors(new TreblleInterceptor(treblleOptions)) // Use an instance with options
 class ApiController {
   @Get('users')
   getUsers() {
@@ -77,21 +80,24 @@ class ApiController {
   }
 }
 
+// Extract the middleware class as well
+const { TreblleModule, TreblleMiddleware } = treblleNestJS;
+
 // Register the Treblle module
 @Module({
   imports: [
-    treblleNestJS.TreblleModule.register(treblleOptions) // All components share the same Treblle instance
+    TreblleModule.register(treblleOptions) // All components share the same Treblle instance
   ],
   controllers: [ApiController]
 })
 class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    // Apply body parsers and Treblle middleware in the correct order
+    // Use the pre-built middleware function 
     consumer
       .apply(
         express.json(), 
         express.urlencoded({ extended: true }), 
-        treblleNestJS.TreblleMiddleware
+        treblleNestJS.createMiddleware(treblleOptions)
       )
       .forRoutes('*');
   }
@@ -102,7 +108,7 @@ class AppModule implements NestModule {
 //============================================================================
 // 
 // @Module({
-//   imports: [treblleNestJS.TreblleModule.register(treblleOptions)],
+//   imports: [TreblleModule.register(treblleOptions)],
 //   controllers: [ApiController]
 // })
 // class AppModule {}
@@ -115,15 +121,15 @@ class AppModule implements NestModule {
 //   app.use(express.urlencoded({ extended: true }));
 //   
 //   // Apply treblle middleware after body parsers
-//   const treblleMiddleware = app.get(treblleNestJS.TreblleMiddleware);
+//   const treblleMiddleware = app.get(TreblleMiddleware);
 //   app.use(treblleMiddleware.use.bind(treblleMiddleware));
 //   
 //   // Apply global exception filter
-//   const treblleExceptionFilter = app.get(treblleNestJS.TreblleExceptionFilter);
+//   const treblleExceptionFilter = app.get(TreblleExceptionFilter);
 //   app.useGlobalFilters(treblleExceptionFilter);
 //   
-//   // Apply global interceptor
-//   const treblleInterceptor = app.get(treblleNestJS.TreblleInterceptor);
+//   // Apply global interceptor - get the existing instance from the container
+//   const treblleInterceptor = app.get(TreblleInterceptor);
 //   app.useGlobalInterceptors(treblleInterceptor);
 //   
 //   await app.listen(3000);
