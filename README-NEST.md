@@ -8,11 +8,13 @@ This guide explains how to integrate Treblle with your NestJS applications to mo
 npm install treblle-js --save
 ```
 
-## Quick Start (Simplified Integration)
+## Quick Start
 
-The Treblle SDK now provides a simplified integration for NestJS with shared configuration between middleware and error handlers.
+The Treblle SDK provides several integration approaches for NestJS applications.
 
-### Option 1: Using the Module System (Recommended)
+### Option 1: Using the Function Middleware (Recommended)
+
+This approach uses a simple function middleware, which avoids dependency injection issues and is the most reliable method.
 
 ```typescript
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
@@ -22,8 +24,8 @@ import { nestjs as treblleNestJS } from 'treblle-js/integrations';
 
 // Define Treblle options once
 const treblleOptions = {
-  sdkToken: process.env.TREBLLE_SDK_TOKEN,
-  apiKey: process.env.TREBLLE_API_KEY,
+  sdkToken: process.env.TREBLLE_SDK_TOKEN || 'YOUR_SDK_TOKEN',
+  apiKey: process.env.TREBLLE_API_KEY || 'YOUR_API_KEY',
   additionalMaskedFields: ['password'],
   debug: process.env.NODE_ENV !== 'production',
   environments: {
@@ -31,81 +33,95 @@ const treblleOptions = {
   }
 };
 
+// Extract filter and interceptor
+const { TreblleExceptionFilter, TreblleInterceptor } = treblleNestJS;
+
 // Controller with error handling provided by Treblle
 @Controller('api')
-@UseFilters(treblleNestJS.TreblleExceptionFilter) // Uses shared instance from module
-@UseInterceptors(treblleNestJS.TreblleInterceptor) // Uses shared instance from module
+@UseFilters(new TreblleExceptionFilter(treblleOptions))
+@UseInterceptors(new TreblleInterceptor(treblleOptions))
 export class ApiController {
   @Get('users')
   getUsers() {
-    // API logic
+    // Your API logic here
+    return { success: true, data: [/* users data */] };
   }
 
   @Post('auth/login')
   login(@Body() loginDto: any) {
-    // API logic
+    // Your authentication logic here
+    return { success: true, token: 'sample-token' };
   }
 }
 
-// Root module with Treblle registration
+// Register the Treblle module and apply middleware
 @Module({
   imports: [
-    treblleNestJS.TreblleModule.register(treblleOptions) // Global module with shared configuration
+    treblleNestJS.TreblleModule.register(treblleOptions)
   ],
   controllers: [ApiController]
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    // Apply body parsers followed by Treblle middleware
+    // Apply body parsers and Treblle middleware in the correct order
     consumer
       .apply(
-        express.json(),
-        express.urlencoded({ extended: true }),
-        treblleNestJS.TreblleMiddleware
+        express.json(), 
+        express.urlencoded({ extended: true }), 
+        treblleNestJS.createMiddleware(treblleOptions)
       )
       .forRoutes('*');
   }
 }
 ```
 
-### Option 2: Manual Setup (Alternative)
+### Option 2: Manual Setup in bootstrap()
+
+For applications that need more control over the middleware setup:
 
 ```typescript
 import { nestjs as treblleNestJS } from 'treblle-js/integrations';
+import * as express from 'express';
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
 
-// Define Treblle options once
+// Define Treblle options
 const treblleOptions = {
-  sdkToken: process.env.TREBLLE_SDK_TOKEN,
-  apiKey: process.env.TREBLLE_API_KEY
+  sdkToken: process.env.TREBLLE_SDK_TOKEN || 'YOUR_SDK_TOKEN',
+  apiKey: process.env.TREBLLE_API_KEY || 'YOUR_API_KEY',
+  debug: true
 };
 
-// Create middleware with options
-// This also creates and stores a default instance for other components
-const treblleMiddleware = new treblleNestJS.TreblleMiddleware(treblleOptions);
-
-// Create exception filter and interceptor WITHOUT options
-// They will automatically use the default instance created by middleware
-const treblleExceptionFilter = new treblleNestJS.TreblleExceptionFilter();
-const treblleInterceptor = new treblleNestJS.TreblleInterceptor();
-
-// Use in controller
-@Controller('api')
-@UseFilters(treblleExceptionFilter)
-@UseInterceptors(treblleInterceptor)
-export class ApiController {
-  // Controller methods...
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  
+  // Apply body parsers first (IMPORTANT)
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
+  
+  // Apply Treblle middleware after body parsers
+  app.use(treblleNestJS.createMiddleware(treblleOptions));
+  
+  // Apply global exception filter
+  app.useGlobalFilters(new treblleNestJS.TreblleExceptionFilter(treblleOptions));
+  
+  // Apply global interceptor
+  app.useGlobalInterceptors(new treblleNestJS.TreblleInterceptor(treblleOptions));
+  
+  await app.listen(3000);
 }
+bootstrap();
 ```
 
 ## Integration Components
 
 Treblle provides three main components for NestJS:
 
-1. **TreblleMiddleware** - Captures request/response data
+1. **Middleware Function** - Created using `createMiddleware()` - Captures request/response data
 2. **TreblleExceptionFilter** - Captures errors in controllers
 3. **TreblleInterceptor** - Handles errors during request processing
 
-The updated SDK allows these components to share configuration, so you only need to provide options once.
+Each component should be configured with the same options to ensure consistent behavior.
 
 ## Important: Middleware Order
 
@@ -115,11 +131,11 @@ In NestJS, middleware functions are executed in the order they're added. For Tre
 
 ```typescript
 // Wrong order - Treblle won't capture request bodies
-app.use(treblleMiddleware.use.bind(treblleMiddleware));
+app.use(treblleNestJS.createMiddleware(treblleOptions));
 app.use(express.json());
 ```
 
-### ✅ Correct Order - Option 1: With middleware consumer
+### ✅ Correct Order - With middleware consumer
 
 ```typescript
 // In AppModule
@@ -129,110 +145,66 @@ configure(consumer: MiddlewareConsumer) {
     .apply(
       express.json(),
       express.urlencoded({ extended: true }),
-      TreblleMiddleware
+      treblleNestJS.createMiddleware(treblleOptions)
     )
     .forRoutes('*');
 }
 ```
 
-### ✅ Correct Order - Option 2: With app.use()
+### ✅ Correct Order - With app.use()
 
 ```typescript
 // In bootstrap()
 // Correct order - Parse bodies first, then apply Treblle
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(treblleMiddleware.use.bind(treblleMiddleware));
+app.use(treblleNestJS.createMiddleware(treblleOptions));
 ```
 
-## Global Integration in NestJS
+## Error Handling
 
-Add Treblle to your `main.ts` file:
+Treblle offers two ways to handle errors in NestJS:
 
-```typescript
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
-import express from 'express';
-import { TreblleMiddleware } from 'treblle-js/integrations/nestjs';
-
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  
-  // 1. Parse request bodies FIRST
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
-  
-  // 2. Get Treblle middleware from the module
-  const treblleMiddleware = app.get(TreblleMiddleware);
-  
-  // 3. Apply Treblle middleware AFTER body parsers
-  app.use(treblleMiddleware.use.bind(treblleMiddleware));
-  
-  await app.listen(3000);
-}
-bootstrap();
-```
-
-## Module-based Integration
-
-For a more granular approach, you can apply Treblle to specific modules:
-
-1. Register the Treblle module in your `app.module.ts`:
+### Controller-level Error Handling
 
 ```typescript
-import { Module } from '@nestjs/common';
+import { Controller, UseFilters, UseInterceptors } from '@nestjs/common';
 import { nestjs as treblleNestJS } from 'treblle-js/integrations';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
 
-@Module({
-  imports: [
-    treblleNestJS.TreblleModule.register({
-      sdkToken: 'YOUR_SDK_TOKEN',
-      apiKey: 'YOUR_API_KEY',
-      additionalMaskedFields: ['custom_field_to_mask'],
-    }),
-  ],
-  controllers: [AppController],
-  providers: [AppService],
-})
-export class AppModule {}
-```
+const treblleOptions = {
+  sdkToken: process.env.TREBLLE_SDK_TOKEN,
+  apiKey: process.env.TREBLLE_API_KEY
+};
 
-2. Implement `NestModule` in your module to apply middleware to specific routes:
-
-```typescript
-import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
-import { nestjs as treblleNestJS } from 'treblle-js/integrations';
-import { UserController } from './user.controller';
-
-@Module({
-  controllers: [UserController],
-})
-export class UserModule implements NestModule {
-  configure(consumer: MiddlewareConsumer) {
-    // Apply Treblle to all routes in UserController
-    consumer
-      .apply(treblleNestJS.TreblleMiddleware)
-      .forRoutes(UserController);
-  }
+@Controller('api')
+@UseFilters(new treblleNestJS.TreblleExceptionFilter(treblleOptions))
+@UseInterceptors(new treblleNestJS.TreblleInterceptor(treblleOptions))
+export class ApiController {
+  // Controller methods...
 }
 ```
 
-## Error Handling with TreblleExceptionFilter
-
-To capture errors in your NestJS application:
+### Global Error Handling
 
 ```typescript
 import { Module } from '@nestjs/common';
-import { APP_FILTER } from '@nestjs/core';
+import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { nestjs as treblleNestJS } from 'treblle-js/integrations';
+
+const treblleOptions = {
+  sdkToken: process.env.TREBLLE_SDK_TOKEN,
+  apiKey: process.env.TREBLLE_API_KEY
+};
 
 @Module({
   providers: [
     {
       provide: APP_FILTER,
-      useClass: treblleNestJS.TreblleExceptionFilter, // No need to pass options if middleware is used
+      useValue: new treblleNestJS.TreblleExceptionFilter(treblleOptions),
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useValue: new treblleNestJS.TreblleInterceptor(treblleOptions),
     },
   ],
 })
@@ -275,13 +247,24 @@ const treblleOptions = {
 
 ## Best Practices
 
-1. **Body Parsers First**: Always apply body parsing middleware before Treblle
-2. **Error Handling**: Use TreblleExceptionFilter to capture errors
-3. **Environment Configuration**: Use environment variables for sensitive keys
-4. **Field Masking**: Configure additional fields to mask with `additionalMaskedFields`
-5. **Shared Configuration**: Use the module system to share config between components
+1. **Use Function Middleware**: For the most reliable integration, use `treblleNestJS.createMiddleware(options)` 
+2. **Body Parsers First**: Always apply body parsing middleware before Treblle
+3. **Error Handling**: Use TreblleExceptionFilter and TreblleInterceptor together for comprehensive error tracking
+4. **Environment Configuration**: Use environment variables for sensitive keys
+5. **Field Masking**: Configure additional fields to mask with `additionalMaskedFields`
+6. **Debugging**: Enable debug mode during development to see detailed logs
 
 Follow these guidelines to ensure Treblle properly monitors your NestJS API with minimal performance impact.
+
+## Troubleshooting
+
+If you're not seeing logs for your API requests, check the following:
+
+1. Ensure debug mode is enabled in your configuration
+2. Verify that body parsers are applied before Treblle middleware
+3. Confirm that your SDK token and API key are correct
+4. Make sure the middleware is correctly applied to your routes
+5. Verify that the environment is not in the disabled list
 
 ## Support
 
