@@ -7,7 +7,7 @@ import express from 'express';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
 // Example 1: Using the Treblle class directly
-import Treblle from '../src'; // In your project, use 'treblle-sdk'
+import Treblle from '../src'; // In your project, use 'treblle-js'
 
 // Example 2: Using the Express integration (recommended approach)
 import { express as treblleExpress } from '../src/integrations';
@@ -119,8 +119,9 @@ app.use((err, req, res, next) => {
 // Instead of the separate middleware and error handler, you can use:
 // treblleExpress.configureTreblle(app, treblleOptions);
 
-// Example 4: Class-based middleware pattern (alternative)
+// Example 4: Class-based middleware pattern (not recommended)
 // ------------------------------------------------------
+// This pattern may lead to issues in some frameworks, so prefer the function-based approach
 // const middleware = new treblleExpress.TreblleMiddleware(treblleOptions);
 // app.use((req, res, next) => middleware.use(req, res, next));
 // app.use((err, req, res, next) => middleware.handleError(err, req, res, next));

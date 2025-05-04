@@ -583,7 +583,12 @@ const treblle = new Treblle({
 
 ## Framework Support
 
-Currently, this SDK officially supports Express. Support for other frameworks like AdonisJS, NestJS, and Koa is coming soon.
+This SDK officially supports:
+
+- **Express**: Full integration with comprehensive request/response monitoring and error tracking
+- **NestJS**: Full integration with middleware, exception filters, and interceptors
+
+For NestJS specific instructions, see [README-NEST.md](./README-NEST.md).
 
 ## Contributing
 
