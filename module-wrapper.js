@@ -1,12 +1,12 @@
 /**
  * @file module-wrapper.js
  * @description Wrapper to enable CommonJS require and ES Module imports
- * 
+ *
  * This file should be referenced in package.json as the "main" entry point
  */
 
 // Get all exports from the compiled file
-const compiledModule = require('./dist/index.js');
+const compiledModule = require("./dist/index.js");
 const TreblleImport = compiledModule.default;
 
 // Export default class as the main export to enable: const Treblle = require('treblle-js');
@@ -24,5 +24,5 @@ module.exports.integrations = compiledModule.integrations;
 
 // Log debug message about available exports (can be removed in production)
 if (process.env.DEBUG) {
-  console.log('[Treblle SDK] Available exports:', Object.keys(module.exports));
+    console.log("[Treblle SDK] Available exports:", Object.keys(module.exports));
 }

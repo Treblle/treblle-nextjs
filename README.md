@@ -31,8 +31,8 @@ npm install treblle-js --save
 The Express integration provides a simplified way to use Treblle with shared configuration between middleware and error handler.
 
 ```javascript
-const express = require('express');
-const { express: treblleExpress } = require('treblle-js').integrations;
+const express = require("express");
+const { express: treblleExpress } = require("treblle-js").integrations;
 
 const app = express();
 
@@ -42,21 +42,21 @@ app.use(express.urlencoded({ extended: true }));
 
 // Define Treblle options
 const treblleOptions = {
-  sdkToken: 'YOUR_SDK_TOKEN',
-  apiKey: 'YOUR_API_KEY',
-  additionalMaskedFields: ['custom_field_to_mask'],
+  sdkToken: "YOUR_SDK_TOKEN",
+  apiKey: "YOUR_API_KEY",
+  additionalMaskedFields: ["custom_field_to_mask"],
   debug: false, // set to true to see errors in console
   environments: {
     // Disable in test environment
-    disabled: ['test']
-  }
+    disabled: ["test"],
+  },
 };
 
 // Add Treblle middleware
 app.use(treblleExpress.createTreblleMiddleware(treblleOptions));
 
 // Your routes and other middleware here
-app.get('/api/users', (req, res) => {
+app.get("/api/users", (req, res) => {
   // API logic
 });
 
@@ -66,19 +66,19 @@ app.use(treblleExpress.createTreblleErrorHandler());
 
 // Your application's error handler comes after
 app.use((err, req, res, next) => {
-  res.status(500).json({ error: 'Server error' });
+  res.status(500).json({ error: "Server error" });
 });
 
 app.listen(3000, () => {
-  console.log('Server running on port 3000');
+  console.log("Server running on port 3000");
 });
 ```
 
 ### Using the Treblle Class Directly (Alternative)
 
 ```javascript
-const express = require('express');
-const Treblle = require('treblle-js');
+const express = require("express");
+const Treblle = require("treblle-js");
 
 const app = express();
 
@@ -88,21 +88,21 @@ app.use(express.urlencoded({ extended: true }));
 
 // Initialize Treblle AFTER body parsers
 const treblle = new Treblle({
-  sdkToken: 'YOUR_SDK_TOKEN',
-  apiKey: 'YOUR_API_KEY',
-  additionalMaskedFields: ['custom_field_to_mask'],
+  sdkToken: "YOUR_SDK_TOKEN",
+  apiKey: "YOUR_API_KEY",
+  additionalMaskedFields: ["custom_field_to_mask"],
   debug: false, // set to true to see errors in console
   environments: {
     // Disable in test environment
-    disabled: ['test']
-  }
+    disabled: ["test"],
+  },
 });
 
 // Enable Treblle middleware on all routes AFTER body parsers
 app.use(treblle.middleware());
 
 // Your routes and other middleware here
-app.get('/api/users', (req, res) => {
+app.get("/api/users", (req, res) => {
   // API logic
 });
 
@@ -111,11 +111,11 @@ app.use(treblle.errorHandler());
 
 // Your application's error handler comes after
 app.use((err, req, res, next) => {
-  res.status(500).json({ error: 'Server error' });
+  res.status(500).json({ error: "Server error" });
 });
 
 app.listen(3000, () => {
-  console.log('Server running on port 3000');
+  console.log("Server running on port 3000");
 });
 ```
 
@@ -132,15 +132,15 @@ When using Treblle with Express, **the order of middleware registration is criti
 ### ❌ Incorrect Order (Will Not Capture Request Bodies)
 
 ```javascript
-app.use(treblle.middleware());   // TOO EARLY!
-app.use(express.json());         // Body parser after Treblle can't be captured
+app.use(treblle.middleware()); // TOO EARLY!
+app.use(express.json()); // Body parser after Treblle can't be captured
 ```
 
 ### ✅ Correct Order
 
 ```javascript
-app.use(express.json());         // Parse request bodies first
-app.use(treblle.middleware());   // Now Treblle can capture the parsed body
+app.use(express.json()); // Parse request bodies first
+app.use(treblle.middleware()); // Now Treblle can capture the parsed body
 ```
 
 Following this order ensures that Treblle can properly capture and monitor your API's request and response bodies, providing accurate data in your Treblle dashboard.
@@ -149,16 +149,15 @@ Following this order ensures that Treblle can properly capture and monitor your 
 
 The Treblle SDK accepts the following configuration options:
 
-| Option | Type | Required | Description |
-|--------|------|----------|-------------|
-| `sdkToken` | string | Yes | Your Treblle SDK token obtained during registration |
-| `apiKey` | string | Yes | Your Treblle API key |
-| `additionalMaskedFields` | string[] | No | Additional field names to mask beyond the default ones |
-| `debug` | boolean | No | Enable debug mode to log errors to console (default: `false`) |
-| `excludePaths` | (string \| RegExp)[] | No | Paths to exclude from monitoring (e.g., `['/health', '/metrics']`) |
-| `includePaths` | (string \| RegExp)[] | No | Paths to include in monitoring (e.g., `['/api/v1/*']`) |
-| `enabled` | boolean | No | Explicitly enable or disable the SDK regardless of environment |
-| `environments` | object \| boolean | No | Environment-specific configuration |
+| Option                   | Type                 | Required | Description                                                        |
+| ------------------------ | -------------------- | -------- | ------------------------------------------------------------------ |
+| `sdkToken`               | string               | Yes      | Your Treblle SDK token obtained during registration                |
+| `apiKey`                 | string               | Yes      | Your Treblle API key                                               |
+| `additionalMaskedFields` | string[]             | No       | Additional field names to mask beyond the default ones             |
+| `debug`                  | boolean              | No       | Enable debug mode to log errors to console (default: `false`)      |
+| `excludePaths`           | (string \| RegExp)[] | No       | Paths to exclude from monitoring (e.g., `['/health', '/metrics']`) |
+| `includePaths`           | (string \| RegExp)[] | No       | Paths to include in monitoring (e.g., `['/api/v1/*']`)             |
+| `enabled`                | boolean              | No       | Explicitly enable or disable the SDK regardless of environment     |
 
 ## Default Masked Fields
 
@@ -184,6 +183,18 @@ Each character in these fields will be replaced with `*` to keep the same length
 
 The SDK can detect your application's environment and adjust its behavior accordingly, allowing you to enable or disable monitoring based on where your app is running.
 
+#### Endpoint Configuration by Environment
+
+By default, the SDK sends data to production Treblle endpoints. However, if you set the `NODE_ENV` environment variable to `staging`, the SDK will automatically use the staging endpoint: `https://gateway-v3-dev.treblle.com`.
+
+For all other `NODE_ENV` values (including `production` or if `NODE_ENV` is not set), the production endpoints will be used:
+
+- `https://rocknrolla.treblle.com`
+- `https://punisher.treblle.com`
+- `https://sicario.treblle.com`
+
+This allows you to test your integration against a staging environment without changing your SDK configuration options.
+
 ### Default Behavior
 
 By default, the SDK is **enabled in all environments**. This ensures monitoring is always active unless explicitly disabled.
@@ -194,20 +205,20 @@ Here's a complete example of using environment-based configuration:
 
 ```javascript
 const treblle = new Treblle({
-  sdkToken: 'YOUR_SDK_TOKEN',
-  apiKey: 'YOUR_API_KEY',
-  
+  sdkToken: "YOUR_SDK_TOKEN",
+  apiKey: "YOUR_API_KEY",
+
   // Environment configuration options
   environments: {
     // Never monitor in test environments
-    disabled: ['test', 'ci'],
-    
+    disabled: ["test", "ci"],
+
     // When running in custom environments, only monitor these specific ones
-    enabled: ['production', 'staging', 'development', 'custom-env-with-monitoring'],
-    
+    enabled: ["production", "staging", "development", "custom-env-with-monitoring"],
+
     // For any environment not listed above, enable monitoring (this is the default)
-    default: true
-  }
+    default: true,
+  },
 });
 ```
 
@@ -221,11 +232,11 @@ To disable the SDK in specific environments (e.g., development, testing):
 
 ```javascript
 const treblle = new Treblle({
-  sdkToken: 'YOUR_SDK_TOKEN',
-  apiKey: 'YOUR_API_KEY',
+  sdkToken: "YOUR_SDK_TOKEN",
+  apiKey: "YOUR_API_KEY",
   environments: {
-    disabled: ['development', 'test'] // Disable in these environments
-  }
+    disabled: ["development", "test"], // Disable in these environments
+  },
 });
 ```
 
@@ -235,12 +246,12 @@ To enable the SDK only in specific environments:
 
 ```javascript
 const treblle = new Treblle({
-  sdkToken: 'YOUR_SDK_TOKEN',
-  apiKey: 'YOUR_API_KEY',
+  sdkToken: "YOUR_SDK_TOKEN",
+  apiKey: "YOUR_API_KEY",
   environments: {
-    enabled: ['production', 'staging'], // Enable only in these environments
-    default: false                      // Disable in all other environments
-  }
+    enabled: ["production", "staging"], // Enable only in these environments
+    default: false, // Disable in all other environments
+  },
 });
 ```
 
@@ -250,9 +261,9 @@ To disable the SDK globally regardless of environment:
 
 ```javascript
 const treblle = new Treblle({
-  sdkToken: 'YOUR_SDK_TOKEN',
-  apiKey: 'YOUR_API_KEY',
-  enabled: false // Disable SDK in all environments
+  sdkToken: "YOUR_SDK_TOKEN",
+  apiKey: "YOUR_API_KEY",
+  enabled: false, // Disable SDK in all environments
 });
 ```
 
@@ -260,15 +271,16 @@ const treblle = new Treblle({
 
 The `environments` option can be configured with these properties:
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `enabled` | string[] | Array of environment names where the SDK should be enabled. If specified, the SDK will ONLY be enabled in these environments unless `default` is true. |
-| `disabled` | string[] | Array of environment names where the SDK should be disabled. Takes precedence over `enabled`. |
-| `default` | boolean | Default behavior for environments not explicitly listed (default: `true` = enabled) |
+| Property   | Type     | Description                                                                                                                                            |
+| ---------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `enabled`  | string[] | Array of environment names where the SDK should be enabled. If specified, the SDK will ONLY be enabled in these environments unless `default` is true. |
+| `disabled` | string[] | Array of environment names where the SDK should be disabled. Takes precedence over `enabled`.                                                          |
+| `default`  | boolean  | Default behavior for environments not explicitly listed (default: `true` = enabled)                                                                    |
 
 ### Environment Names
 
 Common environment names that can be used in configuration:
+
 - `production` (or `prod`)
 - `staging` (or `stage`)
 - `qa`
@@ -282,12 +294,12 @@ In debug mode, the SDK will log which environment was detected and whether monit
 
 ```javascript
 const treblle = new Treblle({
-  sdkToken: 'YOUR_SDK_TOKEN',
-  apiKey: 'YOUR_API_KEY',
+  sdkToken: "YOUR_SDK_TOKEN",
+  apiKey: "YOUR_API_KEY",
   debug: true,
   environments: {
-    disabled: ['development']
-  }
+    disabled: ["development"],
+  },
 });
 
 // Console output in development:
@@ -314,6 +326,7 @@ When an API request is processed, Treblle identifies the Express route pattern i
 ```
 
 This helps you:
+
 - Group similar API requests together
 - Generate accurate API documentation
 - Track endpoint usage and performance
@@ -334,22 +347,22 @@ The SDK can automatically capture and report detailed information about errors t
 #### Express Integration (Recommended)
 
 ```javascript
-const express = require('express');
-const { express: treblleExpress } = require('treblle-js').integrations;
+const express = require("express");
+const { express: treblleExpress } = require("treblle-js").integrations;
 
 const app = express();
 
 // Configure Treblle once
 const treblleOptions = {
-  sdkToken: 'YOUR_SDK_TOKEN',
-  apiKey: 'YOUR_API_KEY'
+  sdkToken: "YOUR_SDK_TOKEN",
+  apiKey: "YOUR_API_KEY",
 };
 
 // Apply the regular Treblle middleware
 app.use(treblleExpress.createTreblleMiddleware(treblleOptions));
 
 // Your routes and other middleware here
-app.get('/api/users', (req, res) => {
+app.get("/api/users", (req, res) => {
   // API logic
 });
 
@@ -359,27 +372,27 @@ app.use(treblleExpress.createTreblleErrorHandler());
 
 // Your application's error handler comes after
 app.use((err, req, res, next) => {
-  res.status(500).json({ error: 'Server error' });
+  res.status(500).json({ error: "Server error" });
 });
 ```
 
 #### Using the Treblle Class Directly
 
 ```javascript
-const express = require('express');
-const Treblle = require('treblle-js');
+const express = require("express");
+const Treblle = require("treblle-js");
 
 const app = express();
 const treblle = new Treblle({
-  sdkToken: 'YOUR_SDK_TOKEN',
-  apiKey: 'YOUR_API_KEY'
+  sdkToken: "YOUR_SDK_TOKEN",
+  apiKey: "YOUR_API_KEY",
 });
 
 // Apply the regular Treblle middleware
 app.use(treblle.middleware());
 
 // Your routes and other middleware here
-app.get('/api/users', (req, res) => {
+app.get("/api/users", (req, res) => {
   // API logic
 });
 
@@ -389,7 +402,7 @@ app.use(treblle.errorHandler());
 
 // Your application's error handler comes after
 app.use((err, req, res, next) => {
-  res.status(500).json({ error: 'Server error' });
+  res.status(500).json({ error: "Server error" });
 });
 ```
 
@@ -487,13 +500,9 @@ You can add your own fields to be masked:
 
 ```javascript
 const treblle = new Treblle({
-  sdkToken: 'YOUR_SDK_TOKEN',
-  apiKey: 'YOUR_API_KEY',
-  additionalMaskedFields: [
-    'my_secret_field',
-    'user.personal.phone',
-    'sensitive_data'
-  ]
+  sdkToken: "YOUR_SDK_TOKEN",
+  apiKey: "YOUR_API_KEY",
+  additionalMaskedFields: ["my_secret_field", "user.personal.phone", "sensitive_data"],
 });
 ```
 
@@ -507,14 +516,14 @@ Exclude health checks, metrics, and auth endpoints from monitoring:
 
 ```javascript
 const treblle = new Treblle({
-  sdkToken: 'YOUR_SDK_TOKEN',
-  apiKey: 'YOUR_API_KEY',
+  sdkToken: "YOUR_SDK_TOKEN",
+  apiKey: "YOUR_API_KEY",
   excludePaths: [
-    '/health',
-    '/metrics',
-    '/api/auth',
-    /^\/admin\/.*/ // Exclude all paths starting with /admin/
-  ]
+    "/health",
+    "/metrics",
+    "/api/auth",
+    /^\/admin\/.*/, // Exclude all paths starting with /admin/
+  ],
 });
 ```
 
@@ -524,19 +533,20 @@ Only monitor specific API versions or endpoints:
 
 ```javascript
 const treblle = new Treblle({
-  sdkToken: 'YOUR_SDK_TOKEN',
-  apiKey: 'YOUR_API_KEY',
+  sdkToken: "YOUR_SDK_TOKEN",
+  apiKey: "YOUR_API_KEY",
   includePaths: [
-    '/api/v2/*',     // Include all v2 API routes
-    '/api/public/*', // Include all public API routes
-    /^\/api\/users\/.*/  // Include all user-related routes
-  ]
+    "/api/v2/*", // Include all v2 API routes
+    "/api/public/*", // Include all public API routes
+    /^\/api\/users\/.*/, // Include all user-related routes
+  ],
 });
 ```
 
 #### Pattern Matching
 
 Path patterns can be specified in several ways:
+
 - Exact match: `/api/users`
 - Wildcard match: `/api/v1/*` (matches any path starting with `/api/v1/`)
 - Regular expressions: `/^\/api\/v[0-9]+\/.*/` (matches any versioned API path)
@@ -547,15 +557,15 @@ For better security, use environment variables:
 
 ```javascript
 // .env file
-TREBLLE_SDK_TOKEN=your_sdk_token
-TREBLLE_API_KEY=your_api_key
+TREBLLE_SDK_TOKEN = your_sdk_token;
+TREBLLE_API_KEY = your_api_key;
 
 // app.js
-require('dotenv').config();
+require("dotenv").config();
 
 const treblle = new Treblle({
   sdkToken: process.env.TREBLLE_SDK_TOKEN,
-  apiKey: process.env.TREBLLE_API_KEY
+  apiKey: process.env.TREBLLE_API_KEY,
 });
 ```
 
@@ -575,9 +585,9 @@ The SDK is designed to handle all errors silently without affecting your API. If
 
 ```javascript
 const treblle = new Treblle({
-  sdkToken: 'YOUR_SDK_TOKEN',
-  apiKey: 'YOUR_API_KEY',
-  debug: true // Errors will be logged to console
+  sdkToken: "YOUR_SDK_TOKEN",
+  apiKey: "YOUR_API_KEY",
+  debug: true, // Errors will be logged to console
 });
 ```
 

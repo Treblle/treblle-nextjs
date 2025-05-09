@@ -1,0 +1,35 @@
+{
+    "name": "treblle-js-nestjs-example",
+    "version": "1.0.0",
+    "description": "Example of using treblle-js with NestJS",
+    "main": "index.ts",
+    "scripts": {
+        "start": "ts-node index.ts",
+        "dev": "ts-node-dev --respawn index.ts",
+        "build": "tsc"
+    },
+    "keywords": [
+        "treblle",
+        "api",
+        "monitoring",
+        "nestjs",
+        "example"
+    ],
+    "author": "Treblle",
+    "license": "MIT",
+    "dependencies": {
+        "@nestjs/common": "^11.1.0",
+        "@nestjs/core": "^11.1.0",
+        "@nestjs/platform-express": "^11.1.0",
+        "express": "^4.18.2",
+        "reflect-metadata": "^0.1.13",
+        "rxjs": "^7.8.2"
+    },
+    "devDependencies": {
+        "@types/express": "^4.17.17",
+        "@types/node": "^18.15.11",
+        "ts-node": "^10.9.1",
+        "ts-node-dev": "^2.0.0",
+        "typescript": "^5.0.4"
+    }
+}

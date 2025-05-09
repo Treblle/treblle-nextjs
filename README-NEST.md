@@ -17,60 +17,63 @@ The Treblle SDK provides several integration approaches for NestJS applications.
 This approach uses a simple function middleware, which avoids dependency injection issues and is the most reliable method.
 
 ```typescript
-import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
-import { Controller, Get, Post, Body, UseFilters, UseInterceptors } from '@nestjs/common';
-import * as express from 'express';
-import { nestjs as treblleNestJS } from 'treblle-js/integrations';
+import { Module, NestModule, MiddlewareConsumer } from "@nestjs/common";
+import { Controller, Get, Post, Body, UseFilters, UseInterceptors } from "@nestjs/common";
+import * as express from "express";
+import { nestjs as treblleNestJS } from "treblle-js/integrations";
 
 // Define Treblle options once
 const treblleOptions = {
-  sdkToken: process.env.TREBLLE_SDK_TOKEN || 'YOUR_SDK_TOKEN',
-  apiKey: process.env.TREBLLE_API_KEY || 'YOUR_API_KEY',
-  additionalMaskedFields: ['password'],
-  debug: process.env.NODE_ENV !== 'production',
+  sdkToken: process.env.TREBLLE_SDK_TOKEN || "YOUR_SDK_TOKEN",
+  apiKey: process.env.TREBLLE_API_KEY || "YOUR_API_KEY",
+  additionalMaskedFields: ["password"],
+  debug: process.env.NODE_ENV !== "production",
   environments: {
-    disabled: ['test']
-  }
+    disabled: ["test"],
+  },
 };
 
 // Extract filter and interceptor
 const { TreblleExceptionFilter, TreblleInterceptor } = treblleNestJS;
 
 // Controller with error handling provided by Treblle
-@Controller('api')
+@Controller("api")
 @UseFilters(new TreblleExceptionFilter(treblleOptions))
 @UseInterceptors(new TreblleInterceptor(treblleOptions))
 export class ApiController {
-  @Get('users')
+  @Get("users")
   getUsers() {
     // Your API logic here
-    return { success: true, data: [/* users data */] };
+    return {
+      success: true,
+      data: [
+        /* users data */
+      ],
+    };
   }
 
-  @Post('auth/login')
+  @Post("auth/login")
   login(@Body() loginDto: any) {
     // Your authentication logic here
-    return { success: true, token: 'sample-token' };
+    return { success: true, token: "sample-token" };
   }
 }
 
 // Register the Treblle module and apply middleware
 @Module({
-  imports: [
-    treblleNestJS.TreblleModule.register(treblleOptions)
-  ],
-  controllers: [ApiController]
+  imports: [treblleNestJS.TreblleModule.register(treblleOptions)],
+  controllers: [ApiController],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     // Apply body parsers and Treblle middleware in the correct order
     consumer
       .apply(
-        express.json(), 
-        express.urlencoded({ extended: true }), 
+        express.json(),
+        express.urlencoded({ extended: true }),
         treblleNestJS.createMiddleware(treblleOptions)
       )
-      .forRoutes('*');
+      .forRoutes("*");
   }
 }
 ```
@@ -80,34 +83,34 @@ export class AppModule implements NestModule {
 For applications that need more control over the middleware setup:
 
 ```typescript
-import { nestjs as treblleNestJS } from 'treblle-js/integrations';
-import * as express from 'express';
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
+import { nestjs as treblleNestJS } from "treblle-js/integrations";
+import * as express from "express";
+import { NestFactory } from "@nestjs/core";
+import { AppModule } from "./app.module";
 
 // Define Treblle options
 const treblleOptions = {
-  sdkToken: process.env.TREBLLE_SDK_TOKEN || 'YOUR_SDK_TOKEN',
-  apiKey: process.env.TREBLLE_API_KEY || 'YOUR_API_KEY',
-  debug: true
+  sdkToken: process.env.TREBLLE_SDK_TOKEN || "YOUR_SDK_TOKEN",
+  apiKey: process.env.TREBLLE_API_KEY || "YOUR_API_KEY",
+  debug: true,
 };
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  
+
   // Apply body parsers first (IMPORTANT)
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
-  
+
   // Apply Treblle middleware after body parsers
   app.use(treblleNestJS.createMiddleware(treblleOptions));
-  
+
   // Apply global exception filter
   app.useGlobalFilters(new treblleNestJS.TreblleExceptionFilter(treblleOptions));
-  
+
   // Apply global interceptor
   app.useGlobalInterceptors(new treblleNestJS.TreblleInterceptor(treblleOptions));
-  
+
   await app.listen(3000);
 }
 bootstrap();
@@ -168,15 +171,15 @@ Treblle offers two ways to handle errors in NestJS:
 ### Controller-level Error Handling
 
 ```typescript
-import { Controller, UseFilters, UseInterceptors } from '@nestjs/common';
-import { nestjs as treblleNestJS } from 'treblle-js/integrations';
+import { Controller, UseFilters, UseInterceptors } from "@nestjs/common";
+import { nestjs as treblleNestJS } from "treblle-js/integrations";
 
 const treblleOptions = {
   sdkToken: process.env.TREBLLE_SDK_TOKEN,
-  apiKey: process.env.TREBLLE_API_KEY
+  apiKey: process.env.TREBLLE_API_KEY,
 };
 
-@Controller('api')
+@Controller("api")
 @UseFilters(new treblleNestJS.TreblleExceptionFilter(treblleOptions))
 @UseInterceptors(new treblleNestJS.TreblleInterceptor(treblleOptions))
 export class ApiController {
@@ -187,13 +190,13 @@ export class ApiController {
 ### Global Error Handling
 
 ```typescript
-import { Module } from '@nestjs/common';
-import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
-import { nestjs as treblleNestJS } from 'treblle-js/integrations';
+import { Module } from "@nestjs/common";
+import { APP_FILTER, APP_INTERCEPTOR } from "@nestjs/core";
+import { nestjs as treblleNestJS } from "treblle-js/integrations";
 
 const treblleOptions = {
   sdkToken: process.env.TREBLLE_SDK_TOKEN,
-  apiKey: process.env.TREBLLE_API_KEY
+  apiKey: process.env.TREBLLE_API_KEY,
 };
 
 @Module({
@@ -213,18 +216,29 @@ export class AppModule {}
 
 ## Configuration Options
 
-The Treblle SDK accepts the following configuration options:
+The Treblle SDK accepts the following configuration options when used with NestJS components:
 
-| Option | Type | Required | Description |
-|--------|------|----------|-------------|
-| `sdkToken` | string | Yes | Your Treblle SDK token obtained during registration |
-| `apiKey` | string | Yes | Your Treblle API key |
-| `additionalMaskedFields` | string[] | No | Additional field names to mask beyond the default ones |
-| `debug` | boolean | No | Enable debug mode to log errors to console (default: `false`) |
-| `excludePaths` | (string \| RegExp)[] | No | Paths to exclude from monitoring (e.g., `['/health', '/metrics']`) |
-| `includePaths` | (string \| RegExp)[] | No | Paths to include in monitoring (e.g., `['/api/v1/*']`) |
-| `enabled` | boolean | No | Explicitly enable or disable the SDK regardless of environment |
-| `environments` | object \| boolean | No | Environment-specific configuration |
+| Option                   | Type                 | Required | Description                                                        |
+| ------------------------ | -------------------- | -------- | ------------------------------------------------------------------ |
+| `sdkToken`               | string               | Yes      | Your Treblle SDK token obtained during registration                |
+| `apiKey`                 | string               | Yes      | Your Treblle API key                                               |
+| `additionalMaskedFields` | string[]             | No       | Additional field names to mask beyond the default ones             |
+| `debug`                  | boolean              | No       | Enable debug mode to log errors to console (default: `false`)      |
+| `excludePaths`           | (string \| RegExp)[] | No       | Paths to exclude from monitoring (e.g., `['/health', '/metrics']`) |
+| `includePaths`           | (string \| RegExp)[] | No       | Paths to include in monitoring (e.g., `['/api/v1/*']`)             |
+| `enabled`                | boolean              | No       | Explicitly enable or disable the SDK regardless of environment     |
+
+### Endpoint Configuration by Environment
+
+By default, the SDK sends data to production Treblle endpoints. However, if you set the `NODE_ENV` environment variable to `staging`, the SDK will automatically use the staging endpoint.
+
+For all other `NODE_ENV` values (including `production` or if `NODE_ENV` is not set), the production endpoints will be used.
+
+This allows you to test your integration against a staging environment without changing your SDK configuration options. You can set `NODE_ENV` when starting your NestJS application, for example:
+
+```bash
+NODE_ENV=staging npm run start:dev
+```
 
 ## Using Environment Variables
 
@@ -232,22 +246,22 @@ For better security, use environment variables:
 
 ```typescript
 // .env file
-TREBLLE_SDK_TOKEN=your_sdk_token
-TREBLLE_API_KEY=your_api_key
+TREBLLE_SDK_TOKEN = your_sdk_token;
+TREBLLE_API_KEY = your_api_key;
 
 // app.module.ts
-import * as dotenv from 'dotenv';
+import * as dotenv from "dotenv";
 dotenv.config();
 
 const treblleOptions = {
   sdkToken: process.env.TREBLLE_SDK_TOKEN,
-  apiKey: process.env.TREBLLE_API_KEY
+  apiKey: process.env.TREBLLE_API_KEY,
 };
 ```
 
 ## Best Practices
 
-1. **Use Function Middleware**: For the most reliable integration, use `treblleNestJS.createMiddleware(options)` 
+1. **Use Function Middleware**: For the most reliable integration, use `treblleNestJS.createMiddleware(options)`
 2. **Body Parsers First**: Always apply body parsing middleware before Treblle
 3. **Error Handling**: Use TreblleExceptionFilter and TreblleInterceptor together for comprehensive error tracking
 4. **Environment Configuration**: Use environment variables for sensitive keys

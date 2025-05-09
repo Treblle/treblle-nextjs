@@ -1,0 +1,32 @@
+{
+    "name": "treblle-js-express-example",
+    "version": "1.0.0",
+    "description": "Example of using treblle-js with Express",
+    "main": "index.ts",
+    "scripts": {
+        "start": "ts-node index.ts",
+        "dev": "ts-node-dev --respawn index.ts",
+        "build": "tsc"
+    },
+    "keywords": [
+        "treblle",
+        "api",
+        "monitoring",
+        "express",
+        "example"
+    ],
+    "author": "Treblle",
+    "license": "MIT",
+    "dependencies": {
+        "body-parser": "^1.20.2",
+        "dotenv": "^16.3.1",
+        "express": "^4.18.2"
+    },
+    "devDependencies": {
+        "@types/express": "^4.17.17",
+        "@types/node": "^18.15.11",
+        "ts-node": "^10.9.1",
+        "ts-node-dev": "^2.0.0",
+        "typescript": "^5.0.4"
+    }
+}

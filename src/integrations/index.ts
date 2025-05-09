@@ -4,9 +4,9 @@
  */
 
 // Import Express integration directly
-import expressIntegration from './express';
+import expressIntegration from "./express";
 // Import NestJS integration directly
-import nestjsIntegration from './nestjs';
+import nestjsIntegration from "./nestjs";
 
 // Named exports for each integration
 export const express = expressIntegration;
@@ -14,6 +14,6 @@ export const nestjs = nestjsIntegration;
 
 // Default export with all integrations
 export default {
-  express: expressIntegration,
-  nestjs: nestjsIntegration
+    express: expressIntegration,
+    nestjs: nestjsIntegration,
 };
