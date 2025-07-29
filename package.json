@@ -59,5 +59,10 @@
   },
   "peerDependencies": {
     "express": ">=4.0.0"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.1.5",
+    "@nestjs/core": "^11.1.5",
+    "dotenv": "^17.2.1"
   }
 }
