@@ -8,8 +8,8 @@ import { withTreblle } from 'treblle-js/integrations/nextjs';
 
 // Configure Treblle
 const treblleWrapper = withTreblle({
-  sdkToken: process.env.TREBLLE_SDK_TOKEN || 'your-sdk-token',
-  apiKey: process.env.TREBLLE_API_KEY || 'your-api-key',
+  sdkToken: process.env.TREBLLE_SDK_TOKEN,
+  apiKey: process.env.TREBLLE_API_KEY,
   debug: true,
   enabled: true,
   environments: ['development', 'production'],
@@ -40,33 +40,3 @@ async function postHandler(request, { params }) {
   }, { status: 201 });
 }
 
-// Error handling example
-async function errorHandler(request, { params }) {
-  // This will trigger error tracking
-  throw new Error('Test error for Treblle monitoring');
-}
-
-// Export wrapped handlers
-export const GET = treblleWrapper(getHandler);
-export const POST = treblleWrapper(postHandler);
-
-// If you want to test error handling, uncomment:
-// export const DELETE = treblleWrapper(errorHandler);
-
-/**
- * File structure for Next.js App Router:
- * 
- * app/
- * ├── api/
- * │   ├── users/
- * │   │   └── route.js (this file)
- * │   └── users/
- * │       └── [id]/
- * │           └── route.js (for dynamic routes)
- * 
- * Usage examples:
- * GET /api/users
- * GET /api/users?id=123
- * POST /api/users
- * GET /api/users/123 (if using [id] dynamic route)
- */
