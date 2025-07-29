@@ -4,7 +4,7 @@
  */
 
 import { TreblleOptions } from './types';
-import os from 'os';
+import * as os from 'os';
 
 /**
  * @function getCurrentEnvironment

@@ -15,6 +15,16 @@
       "require": "./dist/integrations/index.js",
       "import": "./dist/integrations/index.js",
       "types": "./dist/integrations/index.d.ts"
+    },
+    "./integrations/nextjs": {
+      "require": "./dist/integrations/nextjs.js",
+      "import": "./dist/integrations/nextjs.js",
+      "types": "./dist/integrations/nextjs.d.ts"
+    },
+    "./integrations/express": {
+      "require": "./dist/integrations/express.js",
+      "import": "./dist/integrations/express.js",
+      "types": "./dist/integrations/express.d.ts"
     }
   },
   "scripts": {
@@ -43,7 +53,8 @@
   "homepage": "https://github.com/Treblle/treblle-js#readme",
   "devDependencies": {
     "@types/express": "^4.17.17",
-    "@types/node": "^18.15.11",
+    "@types/node": "^18.19.120",
+    "next": "^15.4.4",
     "typescript": "^5.0.4"
   },
   "peerDependencies": {

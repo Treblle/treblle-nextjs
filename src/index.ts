@@ -14,7 +14,7 @@ import {
   calculateResponseSize, 
   extractRoutePath
 } from './utils';
-import https from 'https';
+import * as https from 'https';
 
 // Constants
 const TREBLLE_ENDPOINTS = [
@@ -25,7 +25,7 @@ const TREBLLE_ENDPOINTS = [
 
 // Import integrations for re-export
 import * as expressIntegration from './integrations/express';
-import * as nestjsIntegration from './integrations/nestjs';
+// import * as nestjsIntegration from './integrations/nestjs';
 
 /**
  * @class Treblle
@@ -598,6 +598,28 @@ class Treblle {
   }
 
   /**
+   * @method formatError
+   * @description Format an error for telemetry reporting
+   * @param err - Error object
+   * @returns Formatted error info
+   */
+  formatError(err: unknown): TreblleError {
+    return this._processError(err);
+  }
+
+  /**
+   * @method capture
+   * @description Send payload to Treblle endpoints
+   * @param payload - The payload to send
+   */
+  capture(payload: any): void {
+    if (!this.enabled) {
+      return;
+    }
+    this._sendPayload(payload);
+  }
+
+  /**
    * @method _handleError
    * @private
    * @description Handles errors silently or logs them in debug mode
@@ -612,12 +634,12 @@ class Treblle {
 
 // Export integrations directly as named exports
 export const express = expressIntegration;
-export const nestjs = nestjsIntegration;
+// export const nestjs = nestjsIntegration;
 
 // Export the integrations object for backwards compatibility
 export const integrations = {
   express: expressIntegration,
-  nestjs: nestjsIntegration
+  // nestjs: nestjsIntegration
 };
 
 // Export the Treblle class as both default and named export

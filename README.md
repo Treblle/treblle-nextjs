@@ -9,7 +9,7 @@ Official Treblle SDK for NodeJS applications. Monitor API requests in real-time 
 - 🚀 Zero performance impact with fire-and-forget approach
 - 🛡️ Built with security and privacy in mind
 - 🪶 Lightweight with minimal dependencies
-- 🔌 Easy integration with Express
+- 🔌 Easy integration with Express, NestJS, and Next.js
 - 🧩 TypeScript support
 - 📦 Smart handling of file uploads and downloads
 - 🧠 Intelligent processing of non-JSON responses
@@ -587,8 +587,52 @@ This SDK officially supports:
 
 - **Express**: Full integration with comprehensive request/response monitoring and error tracking
 - **NestJS**: Full integration with middleware, exception filters, and interceptors
+- **Next.js (App Router)**: Route handler wrapper for monitoring API routes
 
 For NestJS specific instructions, see [README-NEST.md](./README-NEST.md).
+
+### Next.js (App Router) Integration
+
+The Next.js integration allows you to monitor API routes in the App Router with a simple wrapper:
+
+```typescript
+// app/api/users/route.ts
+import { withTreblle } from 'treblle-js/integrations/nextjs';
+
+const treblle = withTreblle({
+  sdkToken: process.env.TREBLLE_SDK_TOKEN!,
+  apiKey: process.env.TREBLLE_API_KEY!,
+  debug: process.env.NODE_ENV !== 'production',
+});
+
+export const GET = treblle(async (request: Request, { params }) => {
+  // Your API logic here
+  return NextResponse.json({ users: [] });
+});
+
+export const POST = treblle(async (request: Request) => {
+  const body = await request.json();
+  // Create user logic
+  return NextResponse.json({ user: newUser }, { status: 201 });
+});
+```
+
+**Key features for Next.js:**
+- Automatic request/response monitoring
+- Error tracking with stack traces
+- File upload detection and metadata capture
+- Dynamic route parameter tracking (e.g., `/users/[id]` → `/users/{id}`)
+- Compatible with Node.js runtime (Edge runtime not supported)
+
+**Environment Setup:**
+
+Create a `.env.local` file:
+```bash
+TREBLLE_SDK_TOKEN=your_sdk_token_here
+TREBLLE_API_KEY=your_api_key_here
+```
+
+For more detailed examples, see [examples/nextjs-example.ts](./examples/nextjs-example.ts).
 
 ## Contributing
 
