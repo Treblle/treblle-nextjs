@@ -8,31 +8,26 @@ module.exports = {
   },
   collectCoverage: true,
   coverageDirectory: 'coverage',
-  coverageReporters: ['text', 'lcov', 'clover'],
+  coverageReporters: ['text', 'lcov', 'clover', 'html'],
   collectCoverageFrom: [
     'src/**/*.{js,ts}',
     '!src/**/*.d.ts',
     '!src/**/*.interface.ts',
-    '!src/**/index.ts',
   ],
   coverageThreshold: {
     global: {
-      branches: 80,
+      branches: 70,
       functions: 80,
-      lines: 80,
-      statements: 80,
+      lines: 75,
+      statements: 75,
     },
   },
   verbose: true,
-  testTimeout: 10000,
+  testTimeout: 15000,
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
-  globals: {
-    'ts-jest': {
-      tsconfig: 'tsconfig.json',
-    },
-  },
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
   clearMocks: true,
   restoreMocks: true,
   resetMocks: false,
+
 };

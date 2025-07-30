@@ -34,8 +34,6 @@ class LoginDto {
 // Example 1: Recommended approach - Module registration with middleware chaining
 //============================================================================
 
-// Import the class types directly for proper TypeScript type resolution
-// const { TreblleExceptionFilter, TreblleInterceptor } = treblleNestJS;
 
 // Controller with sample endpoints
 @Controller('api')
@@ -83,8 +81,7 @@ class ApiController {
   }
 }
 
-// Extract the middleware class as well
-// const { TreblleModule, TreblleMiddleware } = treblleNestJS;
+
 // Register the Treblle module
 @Module({
   imports: [

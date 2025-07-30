@@ -118,11 +118,19 @@ export class TreblleMiddleware {
   }
 }
 
+/**
+ * Clear all instances (for testing purposes)
+ */
+export function clearInstances(): void {
+  instances.clear();
+}
+
 // Default export with all Express integration functions
 export default {
   createTreblleMiddleware,
   createTreblleErrorHandler,
   configureTreblle,
   applyTreblleToRoutes,
-  TreblleMiddleware
+  TreblleMiddleware,
+  clearInstances
 };

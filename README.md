@@ -26,7 +26,7 @@ npm install treblle-js --save
 
 ## Quick Start
 
-### Using the Express Integration (Recommended)
+### Using the Express Integration
 
 The Express integration provides a simplified way to use Treblle with shared configuration between middleware and error handler.
 
