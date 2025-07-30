@@ -91,13 +91,13 @@ class Treblle {
       const path = req.originalUrl || req.url;
       
       // Check if this path should be excluded
-      if (this._shouldExcludePath(path)) {
-        return next();
+      if (this.shouldExcludePath(path)) {
+      return next();
       }
-      
+
       // Check if includePaths is specified and this path is not included
-      if (this.includePaths.length > 0 && !this._isPathIncluded(path)) {
-        return next();
+      if (this.includePaths.length > 0 && !this.isPathIncluded(path)) {
+      return next();
       }
       
       // Store original timestamp when request started
@@ -291,9 +291,7 @@ class Treblle {
         };
         
         // Asynchronously send data to Treblle (fire and forget)
-        setImmediate(() => {
-          self._sendPayload(payload);
-        });
+        self.capture(payload);
         
         return originalEnd.apply(res, arguments);
       }.bind(this);
@@ -320,7 +318,7 @@ class Treblle {
         res._treblleErrors = res._treblleErrors || [];
         
         // Extract error information with stack trace
-        const error = this._processError(err);
+        const error = this.formatError(err);
         
         // Add to errors array
         res._treblleErrors.push(error);
@@ -332,13 +330,12 @@ class Treblle {
   }
 
   /**
-   * @method _processError
-   * @private
+   * @method formatError
    * @description Extract useful information from an error
    * @param err - The error object
    * @returns Formatted error info
    */
-  private _processError(err: any): TreblleError {
+  public formatError(err: any): TreblleError {
     // Default values if extraction fails
     let errorInfo: TreblleError = {
       file: 'unknown',
@@ -377,6 +374,18 @@ class Treblle {
     }
     
     return errorInfo;
+  }
+
+  /**
+   * @method capture
+   * @description Capture and send telemetry data asynchronously
+   * @param payload - The payload to send
+   */
+  public capture(payload: any): void {
+    // Send asynchronously (fire and forget)
+    setImmediate(() => {
+      this._sendPayload(payload);
+    });
   }
 
   /**
@@ -526,13 +535,12 @@ class Treblle {
   }
 
   /**
-   * @method _shouldExcludePath
-   * @private
+   * @method shouldExcludePath
    * @description Determines if a path should be excluded from monitoring
    * @param path - Request path
    * @returns True if path should be excluded
    */
-  private _shouldExcludePath(path: string): boolean {
+  public shouldExcludePath(path: string): boolean {
     for (const pattern of this.excludePaths) {
       if (this._matchesPattern(path, pattern)) {
         return true;
@@ -542,13 +550,12 @@ class Treblle {
   }
 
   /**
-   * @method _isPathIncluded
-   * @private
+   * @method isPathIncluded
    * @description Determines if a path should be included in monitoring
    * @param path - Request path
    * @returns True if path should be included
    */
-  private _isPathIncluded(path: string): boolean {
+  public isPathIncluded(path: string): boolean {
     // If includePaths is empty, include all paths
     if (this.includePaths.length === 0) {
       return true;
@@ -597,27 +604,7 @@ class Treblle {
     return false;
   }
 
-  /**
-   * @method formatError
-   * @description Format an error for telemetry reporting
-   * @param err - Error object
-   * @returns Formatted error info
-   */
-  formatError(err: unknown): TreblleError {
-    return this._processError(err);
-  }
 
-  /**
-   * @method capture
-   * @description Send payload to Treblle endpoints
-   * @param payload - The payload to send
-   */
-  capture(payload: any): void {
-    if (!this.enabled) {
-      return;
-    }
-    this._sendPayload(payload);
-  }
 
   /**
    * @method _handleError

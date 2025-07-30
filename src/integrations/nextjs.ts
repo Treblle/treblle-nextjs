@@ -5,189 +5,27 @@
 
 import Treblle from '../index';
 import { TreblleOptions, TreblleError } from '../types';
-import { maskSensitiveData } from '../masking';
 import { 
-  getServerIp,
-  calculateResponseSize
+  hrToMicro,
+  getNextClientIp,
+  getNextRoutePath
 } from '../utils';
-
-// Store instances by config hash to avoid creating duplicate instances
-const instances = new Map<string, Treblle>();
+import { 
+  parseNextjsRequestBody, 
+  parseNextjsResponseBody 
+} from '../core/body-parsers';
+import { 
+  buildTrebllePayload,
+  PayloadRequest,
+  PayloadResponse
+} from '../core/payload';
+import { getTreblleInstance } from '../core/instance-manager';
 
 /**
  * Next.js Route Handler type
  */
 export type NextRouteHandler<T = any> = 
   (request: Request, context: { params?: T }) => Response | Promise<Response>;
-
-/**
- * Helper to get or create a Treblle instance based on config
- * @param options - Treblle configuration options
- * @returns Treblle instance
- */
-function getTreblleInstance(options: TreblleOptions): Treblle {
-  // Create a simple hash of the options object
-  const hash = JSON.stringify({
-    sdkToken: options.sdkToken,
-    apiKey: options.apiKey,
-    debug: options.debug,
-    enabled: options.enabled,
-    environments: options.environments,
-    additionalMaskedFields: options.additionalMaskedFields,
-    excludePaths: options.excludePaths,
-    includePaths: options.includePaths
-  });
-  
-  // Check if we already have an instance with these options
-  if (!instances.has(hash)) {
-    instances.set(hash, new Treblle(options));
-  }
-  
-  return instances.get(hash)!;
-}
-
-/**
- * Helper to convert hrtime to microseconds
- * @param hrtime - High resolution time tuple
- * @returns Duration in microseconds
- */
-function hrToMicro(hrtime: [number, number]): number {
-  return hrtime[0] * 1000000 + hrtime[1] / 1000;
-}
-
-/**
- * Helper to extract client IP from Next.js Request
- * @param req - Next.js Request object
- * @returns Client IP address
- */
-function getNextClientIp(req: Request): string {
-  // Try headers in order of preference
-  const headers = req.headers;
-  
-  const forwardedFor = headers.get('x-forwarded-for');
-  if (forwardedFor) {
-    // Get the first IP from the comma-separated list
-    return forwardedFor.split(',')[0].trim();
-  }
-  
-  const realIp = headers.get('x-real-ip');
-  if (realIp) {
-    return realIp;
-  }
-  
-  const clientIp = headers.get('x-client-ip');
-  if (clientIp) {
-    return clientIp;
-  }
-  
-  // Fallback to localhost
-  return '127.0.0.1';
-}
-
-/**
- * Helper to extract route path from Next.js request
- * @param req - Next.js Request object
- * @param context - Route context with params
- * @returns Route path pattern
- */
-function getNextRoutePath(req: Request, context?: { params?: any }): string {
-  const url = new URL(req.url);
-  let pathname = url.pathname;
-  
-  // If we have params, try to replace them with placeholders
-  if (context?.params) {
-    Object.entries(context.params).forEach(([key, value]) => {
-      if (typeof value === 'string') {
-        pathname = pathname.replace(new RegExp(`/${value}(?=/|$)`), `/{${key}}`);
-      }
-    });
-  }
-  
-  return pathname;
-}
-
-/**
- * Helper to safely parse request body
- * @param req - Cloned Next.js Request object
- * @returns Parsed request body
- */
-async function parseRequestBody(req: Request): Promise<any> {
-  try {
-    const contentType = req.headers.get('content-type') || '';
-    
-    if (contentType.includes('application/json')) {
-      return await req.json();
-    } else if (contentType.includes('multipart/form-data')) {
-      // For file uploads, just indicate it's a file
-      return { __type: 'file', contentType };
-    } else if (contentType.includes('application/x-www-form-urlencoded')) {
-      const formData = await req.formData();
-      const result: any = {};
-      formData.forEach((value, key) => {
-        result[key] = value;
-      });
-      return result;
-    } else {
-      const text = await req.text();
-      return text || {};
-    }
-  } catch (error) {
-    // If parsing fails, return empty object
-    return {};
-  }
-}
-
-/**
- * Helper to safely parse response body
- * @param res - Cloned Next.js Response object
- * @returns Parsed response body
- */
-async function parseResponseBody(res: Response): Promise<any> {
-  try {
-    const contentType = res.headers.get('content-type') || '';
-    
-    // Check if it's a file response
-    const contentDisposition = res.headers.get('content-disposition') || '';
-    const isFile = contentDisposition.includes('attachment') || 
-                  contentDisposition.includes('filename') ||
-                  contentType.includes('application/octet-stream') ||
-                  contentType.includes('application/pdf') ||
-                  contentType.includes('image/') ||
-                  contentType.includes('audio/') ||
-                  contentType.includes('video/');
-                  
-    if (isFile) {
-      const contentLength = res.headers.get('content-length') || '0';
-      return {
-        __type: 'file',
-        size: parseInt(contentLength, 10),
-        contentType: contentType
-      };
-    }
-    
-    // Check if response body is readable (not consumed)
-    if (!res.body) {
-      return {};
-    }
-    
-    if (contentType.includes('application/json')) {
-      return await res.json();
-    } else {
-      const text = await res.text();
-      if (!text) return {};
-      
-      // Try to parse as JSON in case content-type is wrong
-      try {
-        return JSON.parse(text);
-      } catch {
-        return { __type: 'text', content: text };
-      }
-    }
-  } catch (error) {
-    // If parsing fails or body is already consumed, return empty object
-    return {};
-  }
-}
 
 /**
  * Creates a wrapped handler that monitors the request/response
@@ -211,9 +49,9 @@ function createWrappedHandler<T extends NextRouteHandler>(
     const url = new URL(request.url);
     const pathname = url.pathname;
     
-    // Check if this path should be excluded (reusing Treblle's internal logic)
-    const shouldExclude = (treblle as any)._shouldExcludePath?.(pathname);
-    const isIncluded = (treblle as any)._isPathIncluded?.(pathname);
+    // Check if this path should be excluded (using public methods)
+    const shouldExclude = treblle.shouldExcludePath(pathname);
+    const isIncluded = treblle.isPathIncluded(pathname);
     
     if (shouldExclude || !isIncluded) {
       return handler(request, context);
@@ -235,7 +73,7 @@ function createWrappedHandler<T extends NextRouteHandler>(
     let requestBody: any = {};
     try {
       const clonedReq = request.clone();
-      requestBody = await parseRequestBody(clonedReq);
+      requestBody = await parseNextjsRequestBody(clonedReq);
     } catch (error) {
       if (options.debug) {
         console.warn('[Treblle SDK] Failed to parse request body:', error);
@@ -268,7 +106,7 @@ function createWrappedHandler<T extends NextRouteHandler>(
     let responseBody: any = {};
     try {
       const clonedRes = response.clone();
-      responseBody = await parseResponseBody(clonedRes);
+      responseBody = await parseNextjsResponseBody(clonedRes);
     } catch (error) {
       if (options.debug) {
         console.warn('[Treblle SDK] Failed to parse response body:', error);
@@ -289,47 +127,35 @@ function createWrappedHandler<T extends NextRouteHandler>(
     // Get route path
     const routePath = getNextRoutePath(request, context);
     
-    // Build the payload according to Treblle specification
-    const payload = {
-      api_key: options.sdkToken,
-      project_id: options.apiKey,
-      sdk: 'nodejs',
-      version: '1.0.0',
-      data: {
-        server: {
-          ip: getServerIp(),
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          os: {
-            name: process.platform,
-            release: process.release.name,
-            architecture: process.arch
-          },
-          software: process.version,
-          language: {
-            name: "nodejs",
-            version: process.version
-          }
-        },
-        request: {
-          timestamp: requestTimestamp,
-          ip: getNextClientIp(request),
-          url: request.url,
-          route_path: routePath,
-          user_agent: request.headers.get('user-agent') || '',
-          method: request.method,
-          headers: maskSensitiveData(requestHeaders, options.additionalMaskedFields),
-          body: maskSensitiveData(requestBody, options.additionalMaskedFields)
-        },
-        response: {
-          headers: maskSensitiveData(responseHeaders, options.additionalMaskedFields),
-          code: response.status,
-          size: calculateResponseSize(responseBody, { getHeader: (name: string) => response.headers.get(name) }),
-          load_time: duration,
-          body: maskSensitiveData(responseBody, options.additionalMaskedFields)
-        },
-        errors: errors
-      }
+    // Build the payload using shared builder
+    const payloadRequest: PayloadRequest = {
+      timestamp: requestTimestamp,
+      ip: getNextClientIp(request),
+      url: request.url,
+      route_path: routePath,
+      user_agent: request.headers.get('user-agent') || '',
+      method: request.method,
+      headers: requestHeaders,
+      body: requestBody
     };
+
+    const payloadResponse: PayloadResponse = {
+      headers: responseHeaders,
+      code: response.status,
+      size: 0, // Will be calculated by payload builder
+      load_time: duration,
+      body: responseBody
+    };
+
+    const payload = buildTrebllePayload({
+      sdkToken: options.sdkToken,
+      apiKey: options.apiKey,
+      request: payloadRequest,
+      response: payloadResponse,
+      errors: errors,
+      options: options,
+      responseObject: { getHeader: (name: string) => response.headers.get(name) }
+    });
     
     // Send telemetry asynchronously
     treblle.capture(payload);
