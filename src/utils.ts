@@ -4,7 +4,7 @@
  */
 
 import { TreblleOptions } from './types';
-import os from 'os';
+import * as os from 'os';
 
 /**
  * @function getCurrentEnvironment
@@ -277,4 +277,67 @@ export function extractRoutePath(req: any): string {
   
   // If all else fails, return the original URL or an empty string
   return req.originalUrl || req.url || '';
+}
+
+/**
+ * @function hrToMicro
+ * @description Helper to convert hrtime to microseconds
+ * @param hrtime - High resolution time tuple
+ * @returns Duration in microseconds
+ */
+export function hrToMicro(hrtime: [number, number]): number {
+  return hrtime[0] * 1000000 + hrtime[1] / 1000;
+}
+
+/**
+ * @function getNextClientIp
+ * @description Helper to extract client IP from Next.js Request
+ * @param req - Next.js Request object
+ * @returns Client IP address
+ */
+export function getNextClientIp(req: Request): string {
+  // Try headers in order of preference
+  const headers = req.headers;
+  
+  const forwardedFor = headers.get('x-forwarded-for');
+  if (forwardedFor) {
+    // Get the first IP from the comma-separated list
+    return forwardedFor.split(',')[0].trim();
+  }
+  
+  const realIp = headers.get('x-real-ip');
+  if (realIp) {
+    return realIp;
+  }
+  
+  const clientIp = headers.get('x-client-ip');
+  if (clientIp) {
+    return clientIp;
+  }
+  
+  // Fallback to localhost
+  return '127.0.0.1';
+}
+
+/**
+ * @function getNextRoutePath
+ * @description Helper to extract route path from Next.js request
+ * @param req - Next.js Request object
+ * @param context - Route context with params
+ * @returns Route path pattern
+ */
+export function getNextRoutePath(req: Request, context?: { params?: any }): string {
+  const url = new URL(req.url);
+  let pathname = url.pathname;
+  
+  // If we have params, try to replace them with placeholders
+  if (context?.params) {
+    Object.entries(context.params).forEach(([key, value]) => {
+      if (typeof value === 'string') {
+        pathname = pathname.replace(new RegExp(`/${value}(?=/|$)`), `/{${key}}`);
+      }
+    });
+  }
+  
+  return pathname;
 }

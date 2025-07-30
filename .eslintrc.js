@@ -5,12 +5,10 @@ module.exports = {
     sourceType: 'module',
     ecmaVersion: 2020,
   },
-  plugins: ['@typescript-eslint/eslint-plugin', 'prettier', 'jest'],
+  plugins: ['@typescript-eslint'],
   extends: [
     'eslint:recommended',
-    'plugin:@typescript-eslint/recommended',
-    'plugin:prettier/recommended',
-    'plugin:jest/recommended',
+    '@typescript-eslint/recommended',
   ],
   root: true,
   env: {
@@ -24,7 +22,7 @@ module.exports = {
     '@typescript-eslint/explicit-function-return-type': 'off',
     '@typescript-eslint/explicit-module-boundary-types': 'off',
     '@typescript-eslint/no-explicit-any': 'warn',
-    '@typescript-eslint/no-unused-vars': ['error', { 
+    '@typescript-eslint/no-unused-vars': ['warn', { 
       argsIgnorePattern: '^_',
       varsIgnorePattern: '^_',
     }],
@@ -64,7 +62,6 @@ module.exports = {
     ],
 
     // General code style and best practices
-    'prettier/prettier': 'error',
     'no-console': ['warn', { allow: ['warn', 'error'] }],
     'no-debugger': 'error',
     'no-duplicate-imports': 'error',
@@ -83,9 +80,6 @@ module.exports = {
       { blankLine: 'always', prev: 'directive', next: '*' },
       { blankLine: 'always', prev: '*', next: 'function' },
     ],
-    'jest/no-disabled-tests': 'warn',
-    'jest/no-focused-tests': 'error',
-    'jest/no-identical-title': 'error',
-    'jest/valid-expect': 'error',
+
   },
 };

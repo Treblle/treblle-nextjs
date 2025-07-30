@@ -15,6 +15,16 @@
       "require": "./dist/integrations/index.js",
       "import": "./dist/integrations/index.js",
       "types": "./dist/integrations/index.d.ts"
+    },
+    "./integrations/nextjs": {
+      "require": "./dist/integrations/nextjs.js",
+      "import": "./dist/integrations/nextjs.js",
+      "types": "./dist/integrations/nextjs.d.ts"
+    },
+    "./integrations/express": {
+      "require": "./dist/integrations/express.js",
+      "import": "./dist/integrations/express.js",
+      "types": "./dist/integrations/express.d.ts"
     }
   },
   "scripts": {
@@ -43,10 +53,25 @@
   "homepage": "https://github.com/Treblle/treblle-js#readme",
   "devDependencies": {
     "@types/express": "^4.17.17",
-    "@types/node": "^18.15.11",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^18.19.120",
+    "@types/supertest": "^6.0.2",
+    "@typescript-eslint/eslint-plugin": "^8.38.0",
+    "@typescript-eslint/parser": "^8.38.0",
+    "eslint": "^9.32.0",
+    "express": "^4.19.2",
+    "jest": "^29.7.0",
+    "next": "^15.4.4",
+    "supertest": "^6.3.4",
+    "ts-jest": "^29.1.2",
     "typescript": "^5.0.4"
   },
   "peerDependencies": {
     "express": ">=4.0.0"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.1.5",
+    "@nestjs/core": "^11.1.5",
+    "dotenv": "^17.2.1"
   }
 }
