@@ -3,10 +3,14 @@
  * @description Example using Treblle SDK with NestJS
  */
 
-import { Module, NestModule, MiddlewareConsumer, Controller, Get, Post, Body, UseFilters, UseInterceptors } from '@nestjs/common';
+import 'reflect-metadata';
+import { Module, NestModule, MiddlewareConsumer, Controller, Get, Post, Body } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import * as express from 'express';
 import { nestjs as treblleNestJS } from '../src/integrations'; // In your project, use 'treblle-js/integrations'
+
+// Destructure TreblleModule along with other classes
+const { TreblleModule, TreblleExceptionFilter, TreblleInterceptor } = treblleNestJS;
 
 // Configuration for Treblle
 const treblleOptions = {
@@ -21,24 +25,21 @@ const treblleOptions = {
 
 // User DTO
 class LoginDto {
-  email: string;
-  password: string;
+  // Using definite-assignment assertion (!) because DTOs are populated via NestJS validation pipe, not constructor
+  email!: string;
+  password!: string;
 }
 
 //============================================================================
 // Example 1: Recommended approach - Module registration with middleware chaining
 //============================================================================
 
-// Import the class types directly for proper TypeScript type resolution
-const { TreblleExceptionFilter, TreblleInterceptor } = treblleNestJS;
 
 // Controller with sample endpoints
 @Controller('api')
-@UseFilters(new TreblleExceptionFilter(treblleOptions)) // Use an instance with options
-@UseInterceptors(new TreblleInterceptor(treblleOptions)) // Use an instance with options
 class ApiController {
   @Get('users')
-  getUsers() {
+  getUsers(): any {
     return {
       success: true,
       data: [
@@ -49,7 +50,7 @@ class ApiController {
   }
 
   @Post('auth/login')
-  login(@Body() loginDto: LoginDto) {
+  login(@Body() loginDto: LoginDto): any {
     // The password field will be automatically masked by Treblle
     if (loginDto.email && loginDto.password) {
       return {
@@ -68,27 +69,28 @@ class ApiController {
   }
 
   @Get('error')
-  throwError() {
+  throwError(): void {
     throw new Error('Test error');
   }
 
   @Get('runtime-error')
-  runtimeError() {
+  runtimeError(): any {
     const undefinedVariable = null;
     // @ts-ignore - Intentional error
     return { result: undefinedVariable.property };
   }
 }
 
-// Extract the middleware class as well
-const { TreblleModule, TreblleMiddleware } = treblleNestJS;
 
 // Register the Treblle module
 @Module({
   imports: [
     TreblleModule.register(treblleOptions) // All components share the same Treblle instance
   ],
-  controllers: [ApiController]
+  controllers: [ApiController],
+  providers: [
+    // TreblleExceptionFilter and TreblleInterceptor are automatically provided by TreblleModule
+  ]
 })
 class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

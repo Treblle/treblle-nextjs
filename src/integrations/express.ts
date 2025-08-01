@@ -6,35 +6,7 @@
 import { RequestHandler, ErrorRequestHandler } from 'express';
 import Treblle from '../index';
 import { TreblleOptions } from '../types';
-
-// Store instances by config hash to avoid creating duplicate instances
-const instances = new Map<string, Treblle>();
-
-/**
- * Helper to get or create a Treblle instance based on config
- * @param options - Treblle configuration options
- * @returns Treblle instance
- */
-function getTreblleInstance(options: TreblleOptions): Treblle {
-  // Create a simple hash of the options object
-  const hash = JSON.stringify({
-    sdkToken: options.sdkToken,
-    apiKey: options.apiKey,
-    debug: options.debug,
-    enabled: options.enabled,
-    environments: options.environments,
-    additionalMaskedFields: options.additionalMaskedFields,
-    excludePaths: options.excludePaths,
-    includePaths: options.includePaths
-  });
-  
-  // Check if we already have an instance with these options
-  if (!instances.has(hash)) {
-    instances.set(hash, new Treblle(options));
-  }
-  
-  return instances.get(hash)!;
-}
+import { getTreblleInstance, clearInstances as clearInstancesImpl } from '../core/instance-manager';
 
 /**
  * @function createTreblleMiddleware
@@ -50,24 +22,18 @@ export function createTreblleMiddleware(options: TreblleOptions): RequestHandler
 /**
  * @function createTreblleErrorHandler
  * @description Creates Express error handler middleware for Treblle
- * @param options - Treblle configuration options (optional if middleware was created first)
+ * @param options - Treblle configuration options (optional - uses default if not provided)
  * @returns Express error middleware function
  */
 export function createTreblleErrorHandler(options?: TreblleOptions): ErrorRequestHandler {
-  // If no options provided, use the most recently created instance
-  let treblle: Treblle;
+  // Use default options if not provided for backward compatibility
+  const treblleOptions = options || {
+    sdkToken: process.env.TREBLLE_API_KEY || '',
+    apiKey: process.env.TREBLLE_PROJECT_ID || '',
+    debug: false
+  };
   
-  if (options) {
-    treblle = getTreblleInstance(options);
-  } else {
-    // If no options provided but instances exist, use the latest instance
-    if (instances.size === 0) {
-      throw new Error('No Treblle instance found. Create middleware first or provide options.');
-    }
-    // Get the last created instance
-    treblle = Array.from(instances.values())[instances.size - 1];
-  }
-  
+  const treblle = getTreblleInstance(treblleOptions);
   return treblle.errorHandler() as ErrorRequestHandler;
 }
 
@@ -118,11 +84,20 @@ export class TreblleMiddleware {
   }
 }
 
+/**
+ * Clear all instances (for testing purposes)
+ * Re-exported from instance manager
+ */
+export function clearInstances(): void {
+  clearInstancesImpl();
+}
+
 // Default export with all Express integration functions
 export default {
   createTreblleMiddleware,
   createTreblleErrorHandler,
   configureTreblle,
   applyTreblleToRoutes,
-  TreblleMiddleware
+  TreblleMiddleware,
+  clearInstances
 };
