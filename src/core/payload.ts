@@ -6,6 +6,7 @@
 import { TreblleOptions, TreblleError } from '../types';
 import { maskSensitiveData } from '../masking';
 import { getServerIp, calculateResponseSize } from '../utils';
+import { processPayloadWithSizeCheck, PayloadSizeOptions } from './payload-size';
 
 export interface PayloadRequest {
   timestamp: string;
@@ -34,6 +35,7 @@ export interface PayloadInput {
   errors: TreblleError[];
   options: TreblleOptions;
   responseObject?: any; // For calculateResponseSize compatibility
+  sizeOptions?: PayloadSizeOptions; // Payload size checking options
 }
 
 /**
@@ -42,6 +44,19 @@ export interface PayloadInput {
  * @returns Treblle API payload
  */
 export function buildTrebllePayload(input: PayloadInput): any {
+  const sizeOptions = input.sizeOptions || {};
+  
+  // Process request and response bodies with size checking
+  const processedRequestBody = processPayloadWithSizeCheck(
+    maskSensitiveData(input.request.body, input.options.additionalMaskedFields),
+    sizeOptions
+  );
+  
+  const processedResponseBody = processPayloadWithSizeCheck(
+    maskSensitiveData(input.response.body, input.options.additionalMaskedFields),
+    sizeOptions
+  );
+  
   return {
     api_key: input.sdkToken,
     project_id: input.apiKey,
@@ -70,7 +85,7 @@ export function buildTrebllePayload(input: PayloadInput): any {
         user_agent: input.request.user_agent,
         method: input.request.method,
         headers: maskSensitiveData(input.request.headers, input.options.additionalMaskedFields),
-        body: maskSensitiveData(input.request.body, input.options.additionalMaskedFields)
+        body: processedRequestBody
       },
       response: {
         headers: maskSensitiveData(input.response.headers, input.options.additionalMaskedFields),
@@ -79,7 +94,7 @@ export function buildTrebllePayload(input: PayloadInput): any {
           calculateResponseSize(input.response.body, input.responseObject) : 
           input.response.size,
         load_time: input.response.load_time,
-        body: maskSensitiveData(input.response.body, input.options.additionalMaskedFields)
+        body: processedResponseBody
       },
       errors: input.errors
     }

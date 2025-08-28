@@ -51,6 +51,21 @@ export interface TreblleOptions {
      * Environment configuration
      */
     environments?: boolean | TreblleEnvironments;
+    
+    /**
+     * Maximum payload size in bytes (default: 5MB)
+     */
+    maxPayloadSize?: number;
+    
+    /**
+     * Warning threshold for large payloads in bytes (default: 2MB)
+     */
+    payloadWarningSize?: number;
+    
+    /**
+     * Enable memory-efficient size estimation (default: true)
+     */
+    enableSizeEstimation?: boolean;
   }
   
   /**

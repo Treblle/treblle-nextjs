@@ -14,6 +14,7 @@ import {
   calculateResponseSize, 
   extractRoutePath
 } from './utils';
+import { processPayloadWithSizeCheck, checkPayloadSize } from './core/payload-size';
 import * as https from 'https';
 
 // Constants
@@ -23,9 +24,7 @@ const TREBLLE_ENDPOINTS = [
   'https://sicario.treblle.com'
 ];
 
-// Import integrations for re-export
-import * as expressIntegration from './integrations/express';
-// import * as nestjsIntegration from './integrations/nestjs';
+
 
 /**
  * @class Treblle
@@ -48,15 +47,17 @@ class Treblle {
   constructor(options: TreblleOptions) {
     // Validate required configuration
     if (!options.sdkToken) {
+      console.error('Treblle SDK requires an SDK token to function properly');
       this._handleError(new Error('Treblle SDK requires an SDK token'));
       return;
     }
 
     if (!options.apiKey) {
+      console.error('Treblle SDK requires an API key to function properly');
       this._handleError(new Error('Treblle SDK requires an API key'));
       return;
     }
-
+    
     this.options = options; // Store options for later use
     this.sdkToken = options.sdkToken;
     this.apiKey = options.apiKey;
@@ -248,6 +249,35 @@ class Treblle {
         const host = req.get('host') || req.headers.host;
         const url = `${protocol}://${host}${req.originalUrl || req.url}`;
         
+        // Check payload sizes for debugging/reporting
+        if (self.debug) {
+          const requestSizeInfo = checkPayloadSize(requestBody, {
+            maxSize: self.options.maxPayloadSize,
+            warningSize: self.options.payloadWarningSize,
+            enableEstimation: self.options.enableSizeEstimation
+          });
+          
+          const responseSizeInfo = checkPayloadSize(responseBody, {
+            maxSize: self.options.maxPayloadSize,
+            warningSize: self.options.payloadWarningSize,
+            enableEstimation: self.options.enableSizeEstimation
+          });
+          
+          if (requestSizeInfo.isLarge) {
+            console.log(`[Treblle SDK] Large request body detected: ${requestSizeInfo.size} bytes`);
+            if (requestSizeInfo.exceedsLimit) {
+              console.log(`[Treblle SDK] Request body exceeds limit, replaced with metadata`);
+            }
+          }
+          
+          if (responseSizeInfo.isLarge) {
+            console.log(`[Treblle SDK] Large response body detected: ${responseSizeInfo.size} bytes`);
+            if (responseSizeInfo.exceedsLimit) {
+              console.log(`[Treblle SDK] Response body exceeds limit, replaced with metadata`);
+            }
+          }
+        }
+        
         // Build the payload according to Treblle specification
         const payload = {
           api_key: self.sdkToken,
@@ -277,14 +307,28 @@ class Treblle {
               user_agent: req.headers['user-agent'] || '',
               method: req.method,
               headers: maskSensitiveData(req.headers, self.options.additionalMaskedFields),
-              body: maskSensitiveData(requestBody, self.options.additionalMaskedFields)
+              body: processPayloadWithSizeCheck(
+                maskSensitiveData(requestBody, self.options.additionalMaskedFields),
+                {
+                  maxSize: self.options.maxPayloadSize,
+                  warningSize: self.options.payloadWarningSize,
+                  enableEstimation: self.options.enableSizeEstimation
+                }
+              )
             },
             response: {
               headers: maskSensitiveData(responseHeaders, self.options.additionalMaskedFields),
               code: res.statusCode,
               size: calculateResponseSize(responseBody, res),
               load_time: duration,
-              body: maskSensitiveData(responseBody, self.options.additionalMaskedFields)
+              body: processPayloadWithSizeCheck(
+                maskSensitiveData(responseBody, self.options.additionalMaskedFields),
+                {
+                  maxSize: self.options.maxPayloadSize,
+                  warningSize: self.options.payloadWarningSize,
+                  enableEstimation: self.options.enableSizeEstimation
+                }
+              )
             },
             errors: res._treblleErrors || []
           }
@@ -618,16 +662,6 @@ class Treblle {
     }
   }
 }
-
-// Export integrations directly as named exports
-export const express = expressIntegration;
-// export const nestjs = nestjsIntegration;
-
-// Export the integrations object for backwards compatibility
-export const integrations = {
-  express: expressIntegration,
-  // nestjs: nestjsIntegration
-};
 
 // Export the Treblle class as both default and named export
 export { Treblle };

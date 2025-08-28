@@ -1,23 +1,10 @@
 /**
  * @file src/integrations/index.ts
- * @description Exports all framework integrations
+ * @description Next.js integration exports
  */
 
-// Import Express integration directly
-import expressIntegration from './express';
-// Import NestJS integration directly
-import nestjsIntegration from './nestjs';
-// Import Next.js integration directly
-import nextjsIntegration from './nextjs';
+export * from './nextjs';
+export { default as nextjs } from './nextjs';
 
-// Named exports for each integration
-export const express = expressIntegration;
-export const nestjs = nestjsIntegration;
-export const nextjs = nextjsIntegration;
-
-// Default export with all integrations
-export default {
-  express: expressIntegration,
-  nestjs: nestjsIntegration,
-  nextjs: nextjsIntegration
-};
+// Default export
+export { default } from './nextjs';

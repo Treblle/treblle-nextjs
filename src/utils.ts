@@ -82,7 +82,12 @@ export function isEnabledForEnvironment(config: TreblleOptions): boolean {
       // Check if current environment is in the enabled list
       if (Array.isArray(config.environments.enabled) && 
           config.environments.enabled.length > 0) {
-        return config.environments.enabled.includes(currentEnv);
+        // If environment is in enabled list, return true
+        if (config.environments.enabled.includes(currentEnv)) {
+          return true;
+        }
+        // If environment is not in enabled list, use default (false if not specified)
+        return config.environments.default === true;
       }
       
       // If environment is not explicitly listed in either, use the default
@@ -102,7 +107,7 @@ export function isEnabledForEnvironment(config: TreblleOptions): boolean {
 /**
  * @function getClientIp
  * @description Gets the client IP address
- * @param req - Express request object
+ * @param req - Request object
  * @returns Client IP address
  */
 export function getClientIp(req: any): string {
@@ -138,7 +143,7 @@ export function getServerIp(): string {
  * @function calculateResponseSize
  * @description Calculate the size of the response in bytes
  * @param body - Response body
- * @param res - Express response object
+ * @param res - Response object
  * @returns Size in bytes
  */
 export function calculateResponseSize(body: any, res: any): number {
@@ -179,104 +184,19 @@ export function calculateResponseSize(body: any, res: any): number {
 
 /**
  * @function extractRoutePath
- * @description Extract the route path pattern from the request
- * @param req - Express request object
+ * @description Extract the route path pattern from the request - NextJS only
+ * @param req - Request object
  * @returns Route path pattern or original URL path if route not available
  */
 export function extractRoutePath(req: any): string {
-  // Try various ways to get the route pattern
-  
-  // 1. Direct access to Express route (most common approach)
-  if (req.route && req.route.path) {
-    // Get the base path from the route
-    let basePath = req.route.path;
-    
-    // Check if there's a baseUrl to prepend (for routers with a base path)
-    if (req.baseUrl) {
-      return `${req.baseUrl}${basePath}`;
-    }
-    
-    return basePath;
-  }
-  
-  // 2. Check for route path in Express 4.x
-  if (req._parsedUrl && req.url) {
-    try {
-      // Try to extract the route by removing query parameters
-      const pathWithoutQuery = req.url.split('?')[0];
-      
-      // If we have router base path, include it
-      if (req.baseUrl) {
-        return `${req.baseUrl}${pathWithoutQuery}`;
-      }
-      
-      return pathWithoutQuery;
-    } catch (e) {
-      // If parsing fails, continue to next approach
-    }
-  }
-  
-  // 3. Access router stack (more complex but can work in some Express setups)
-  if (req.app && req.app._router && req.app._router.stack) {
-    try {
-      const url = req.originalUrl || req.url;
-      const method = req.method.toLowerCase();
-      
-      // Find matching route in the router stack
-      for (const layer of req.app._router.stack) {
-        if (layer.route) {
-          const routePath = layer.route.path;
-          const routeMethods = Object.keys(layer.route.methods);
-          
-          // Check if this route matches our URL pattern and method
-          if (routeMethods.includes(method)) {
-            // Simple matching for exact routes
-            if (routePath === url) {
-              return routePath;
-            }
-            
-            // Check for parametrized routes (/:id pattern)
-            if (routePath.includes(':') && layer.regexp) {
-              const match = layer.regexp.test(url);
-              if (match) {
-                return routePath;
-              }
-            }
-          }
-        }
-      }
-    } catch (e) {
-      // If router stack parsing fails, continue to next approach
-    }
-  }
-  
-  // 4. For NestJS applications
-  if (req.params && Object.keys(req.params).length > 0) {
-    // Try to reconstruct the route path from current URL and params
-    let path = req.originalUrl || req.url;
-    
-    // Remove query string if present
-    path = path.split('?')[0];
-    
-    // Replace actual parameter values with parameter placeholders
-    for (const [paramName, paramValue] of Object.entries(req.params)) {
-      if (typeof paramValue === 'string') {
-        path = path.replace(paramValue, `:${paramName}`);
-      }
-    }
-    
-    return path;
-  }
-  
-  // 5. Last resort: Return the URL path without query parameters
-  // This at least gives us something useful rather than an empty string
+  // For NextJS applications - simplified version
   if (req.originalUrl || req.url) {
     const urlPath = (req.originalUrl || req.url).split('?')[0];
     return urlPath;
   }
   
-  // If all else fails, return the original URL or an empty string
-  return req.originalUrl || req.url || '';
+  // If all else fails, return empty string
+  return '';
 }
 
 /**

@@ -208,14 +208,18 @@ describe('Next.js Integration', () => {
   describe('createTreblleWrapper', () => {
     test('should create reusable wrapper', () => {
       const wrapper = createTreblleWrapper(treblleOptions);
-      expect(typeof wrapper).toBe('function');
+      expect(typeof wrapper).toBe('object');
+      expect(typeof wrapper.handler).toBe('function');
+      expect(typeof wrapper.pagesHandler).toBe('function');
+      expect(typeof wrapper.middleware).toBe('function');
     });
 
-    test('should be equivalent to withTreblle', () => {
+    test('should have different signature than withTreblle', () => {
       const wrapper1 = withTreblle(treblleOptions);
       const wrapper2 = createTreblleWrapper(treblleOptions);
       
-      expect(typeof wrapper1).toBe(typeof wrapper2);
+      expect(typeof wrapper1).toBe('function');
+      expect(typeof wrapper2).toBe('object');
     });
   });
 

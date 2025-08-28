@@ -1,21 +1,23 @@
-# Treblle SDK for NodeJS
+# Treblle SDK for Next.js
 
-Official Treblle SDK for NodeJS applications. Monitor API requests in real-time with zero performance impact.
+Official Treblle SDK for Next.js applications. Monitor API requests in real-time with zero performance impact.
 
 ## Features
 
-- 🔄 Real-time API monitoring
+- 🔄 Real-time API monitoring for Next.js App Router and Pages Router
 - 🔒 Automatic sensitive data masking
 - 🚀 Zero performance impact with fire-and-forget approach
 - 🛡️ Built with security and privacy in mind
 - 🪶 Lightweight with minimal dependencies
-- 🔌 Easy integration with Express, NestJS, and Next.js
-- 🧩 TypeScript support
+- 🔌 Easy integration with Next.js API routes and middleware
+- 🧩 Full TypeScript support with Next.js types
 - 📦 Smart handling of file uploads and downloads
-- 🧠 Intelligent processing of non-JSON responses
+- 🧠 Intelligent processing of streaming responses
 - 🛑 Automatic detection and handling of large payloads
 - 🐛 Detailed error tracking with file and line information
-- 🔍 Automatic endpoint path detection
+- 🔍 Automatic dynamic route detection (`[id]`, `[...slug]`)
+- 🌐 Edge Runtime support
+- ⚡ Serverless environment optimizations
 - 🌎 Environment-based configuration
 
 ## Installation
@@ -26,124 +28,67 @@ npm install treblle-js --save
 
 ## Quick Start
 
-### Using the Express Integration
+### Basic App Router Integration
 
-The Express integration provides a simplified way to use Treblle with shared configuration between middleware and error handler.
+```typescript
+// app/api/users/route.ts
+import { withTreblle } from 'treblle-js/integrations/nextjs';
 
-```javascript
-const express = require('express');
-const { express: treblleExpress } = require('treblle-js').integrations;
+const treblle = withTreblle({
+  sdkToken: process.env.TREBLLE_SDK_TOKEN!,
+  apiKey: process.env.TREBLLE_API_KEY!,
+  debug: process.env.NODE_ENV !== 'production',
+});
 
-const app = express();
+export const GET = treblle(async (request: Request, { params }) => {
+  // Your API logic here
+  const users = await getUsers();
+  return Response.json({ users });
+});
 
-// Parse JSON and URL-encoded bodies FIRST
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+export const POST = treblle(async (request: Request) => {
+  const body = await request.json();
+  const user = await createUser(body);
+  return Response.json({ user }, { status: 201 });
+});
+```
 
-// Define Treblle options
-const treblleOptions = {
-  sdkToken: 'YOUR_SDK_TOKEN',
-  apiKey: 'YOUR_API_KEY',
-  additionalMaskedFields: ['custom_field_to_mask'],
-  debug: false, // set to true to see errors in console
-  environments: {
-    // Disable in test environment
-    disabled: ['test']
-  }
+
+### Middleware Integration
+
+Create a `middleware.ts` file in your project root:
+
+```typescript
+// middleware.ts
+import { createMiddlewareWrapper } from 'treblle-js/integrations/nextjs-middleware';
+
+const withTreblle = createMiddlewareWrapper({
+  sdkToken: process.env.TREBLLE_SDK_TOKEN!,
+  apiKey: process.env.TREBLLE_API_KEY!,
+});
+
+export const middleware = withTreblle(async (request) => {
+  // Your middleware logic here
+  return NextResponse.next();
+});
+
+export const config = {
+  matcher: [
+    '/api/:path*',
+    '/((?!_next/static|_next/image|favicon.ico).*)',
+  ],
 };
-
-// Add Treblle middleware
-app.use(treblleExpress.createTreblleMiddleware(treblleOptions));
-
-// Your routes and other middleware here
-app.get('/api/users', (req, res) => {
-  // API logic
-});
-
-// Add Treblle error handler WITHOUT needing to pass config again
-// The error handler will use the same Treblle instance as the middleware
-app.use(treblleExpress.createTreblleErrorHandler());
-
-// Your application's error handler comes after
-app.use((err, req, res, next) => {
-  res.status(500).json({ error: 'Server error' });
-});
-
-app.listen(3000, () => {
-  console.log('Server running on port 3000');
-});
 ```
 
-### Using the Treblle Class Directly (Alternative)
+## Environment Setup
 
-```javascript
-const express = require('express');
-const Treblle = require('treblle-js');
+Create a `.env.local` file in your project root:
 
-const app = express();
-
-// Parse JSON and URL-encoded bodies FIRST
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Initialize Treblle AFTER body parsers
-const treblle = new Treblle({
-  sdkToken: 'YOUR_SDK_TOKEN',
-  apiKey: 'YOUR_API_KEY',
-  additionalMaskedFields: ['custom_field_to_mask'],
-  debug: false, // set to true to see errors in console
-  environments: {
-    // Disable in test environment
-    disabled: ['test']
-  }
-});
-
-// Enable Treblle middleware on all routes AFTER body parsers
-app.use(treblle.middleware());
-
-// Your routes and other middleware here
-app.get('/api/users', (req, res) => {
-  // API logic
-});
-
-// Add Treblle error handler (before your own error handler)
-app.use(treblle.errorHandler());
-
-// Your application's error handler comes after
-app.use((err, req, res, next) => {
-  res.status(500).json({ error: 'Server error' });
-});
-
-app.listen(3000, () => {
-  console.log('Server running on port 3000');
-});
+```bash
+TREBLLE_SDK_TOKEN=your_sdk_token_here
+TREBLLE_API_KEY=your_api_key_here
+NODE_ENV=development
 ```
-
-## Important: Middleware Order in Express
-
-When using Treblle with Express, **the order of middleware registration is critical**:
-
-1. **Body Parsers First**: Always register Express body parsing middleware (`express.json()` and `express.urlencoded()`) BEFORE the Treblle middleware.
-
-2. **Treblle Middleware After**: Add the Treblle middleware AFTER body parsers but BEFORE your route handlers.
-
-3. **Treblle Error Handler Last**: Add the Treblle error handler after your routes but before your application's error handler.
-
-### ❌ Incorrect Order (Will Not Capture Request Bodies)
-
-```javascript
-app.use(treblle.middleware());   // TOO EARLY!
-app.use(express.json());         // Body parser after Treblle can't be captured
-```
-
-### ✅ Correct Order
-
-```javascript
-app.use(express.json());         // Parse request bodies first
-app.use(treblle.middleware());   // Now Treblle can capture the parsed body
-```
-
-Following this order ensures that Treblle can properly capture and monitor your API's request and response bodies, providing accurate data in your Treblle dashboard.
 
 ## Configuration Options
 
@@ -159,6 +104,83 @@ The Treblle SDK accepts the following configuration options:
 | `includePaths` | (string \| RegExp)[] | No | Paths to include in monitoring (e.g., `['/api/v1/*']`) |
 | `enabled` | boolean | No | Explicitly enable or disable the SDK regardless of environment |
 | `environments` | object \| boolean | No | Environment-specific configuration |
+| `enableEdgeRuntime` | boolean | No | Enable Edge Runtime support (enhanced integration only) |
+| `handleStreaming` | boolean | No | Handle streaming responses (enhanced integration only) |
+| `maxBodySize` | number | No | Maximum body size to process in bytes (default: 2MB) |
+
+## Next.js Specific Features
+
+### Dynamic Route Detection
+
+The SDK automatically detects and normalizes Next.js dynamic routes:
+
+```typescript
+// File: app/api/users/[id]/route.ts
+// URL: /api/users/123
+// Detected route: /api/users/[id]
+
+// File: app/api/blog/[...slug]/route.ts  
+// URL: /api/blog/2023/my-post
+// Detected route: /api/blog/[...slug]
+
+// File: app/api/(auth)/login/route.ts
+// URL: /api/login  
+// Detected route: /api/(auth)/login
+```
+
+### Route Groups Support
+
+Route groups are automatically handled:
+
+```typescript
+// File: app/api/(auth)/login/route.ts
+// File: app/api/(public)/health/route.ts
+// Groups are preserved in route detection
+```
+
+### Edge Runtime Compatibility
+
+The SDK works with both Node.js and Edge runtimes:
+
+```typescript
+// app/api/edge-example/route.ts
+export const runtime = 'edge';
+
+import { withTreblle } from 'treblle-js/integrations/nextjs-enhanced';
+
+const treblle = withTreblle({
+  sdkToken: process.env.TREBLLE_SDK_TOKEN!,
+  apiKey: process.env.TREBLLE_API_KEY!,
+  enableEdgeRuntime: true, // Optimizes for Edge runtime
+});
+
+export const GET = treblle.handler(async (request) => {
+  return Response.json({ message: 'Edge function monitored!' });
+});
+```
+
+### Streaming Response Support
+
+Handle Server-Sent Events and streaming responses:
+
+```typescript
+export const GET = treblle.handler(async (request) => {
+  const stream = new ReadableStream({
+    start(controller) {
+      // Stream data
+      controller.enqueue('data chunk');
+      controller.close();
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/plain',
+      'Transfer-Encoding': 'chunked',
+    },
+  });
+});
+```
 
 ## Default Masked Fields
 
@@ -182,214 +204,72 @@ Each character in these fields will be replaced with `*` to keep the same length
 
 ## Environment-Based Configuration
 
-The SDK can detect your application's environment and adjust its behavior accordingly, allowing you to enable or disable monitoring based on where your app is running.
+The SDK can detect your application's environment and adjust its behavior accordingly:
 
 ### Default Behavior
 
 By default, the SDK is **enabled in all environments**. This ensures monitoring is always active unless explicitly disabled.
 
-### Environment Configuration Example
+### Environment Configuration Examples
 
-Here's a complete example of using environment-based configuration:
-
-```javascript
-const treblle = new Treblle({
-  sdkToken: 'YOUR_SDK_TOKEN',
-  apiKey: 'YOUR_API_KEY',
-  
-  // Environment configuration options
+```typescript
+const treblle = withTreblle({
+  sdkToken: process.env.TREBLLE_SDK_TOKEN!,
+  apiKey: process.env.TREBLLE_API_KEY!,
   environments: {
     // Never monitor in test environments
     disabled: ['test', 'ci'],
     
-    // When running in custom environments, only monitor these specific ones
-    enabled: ['production', 'staging', 'development', 'custom-env-with-monitoring'],
+    // Only monitor in these environments
+    enabled: ['production', 'staging', 'development'],
     
-    // For any environment not listed above, enable monitoring (this is the default)
+    // Default for unlisted environments
     default: true
   }
 });
 ```
 
-### Configuration Options
+### Disabling in Specific Environments
 
-You can customize environment behavior using several options:
-
-#### Disabling in Specific Environments
-
-To disable the SDK in specific environments (e.g., development, testing):
-
-```javascript
-const treblle = new Treblle({
-  sdkToken: 'YOUR_SDK_TOKEN',
-  apiKey: 'YOUR_API_KEY',
+```typescript
+const treblle = withTreblle({
+  sdkToken: process.env.TREBLLE_SDK_TOKEN!,
+  apiKey: process.env.TREBLLE_API_KEY!,
   environments: {
-    disabled: ['development', 'test'] // Disable in these environments
+    disabled: ['development', 'test']
   }
 });
 ```
 
-#### Enabling Only in Specific Environments
+### Enabling Only in Production
 
-To enable the SDK only in specific environments:
-
-```javascript
-const treblle = new Treblle({
-  sdkToken: 'YOUR_SDK_TOKEN',
-  apiKey: 'YOUR_API_KEY',
+```typescript
+const treblle = withTreblle({
+  sdkToken: process.env.TREBLLE_SDK_TOKEN!,
+  apiKey: process.env.TREBLLE_API_KEY!,
   environments: {
-    enabled: ['production', 'staging'], // Enable only in these environments
-    default: false                      // Disable in all other environments
+    enabled: ['production'],
+    default: false
   }
 });
 ```
-
-#### Completely Disabling the SDK
-
-To disable the SDK globally regardless of environment:
-
-```javascript
-const treblle = new Treblle({
-  sdkToken: 'YOUR_SDK_TOKEN',
-  apiKey: 'YOUR_API_KEY',
-  enabled: false // Disable SDK in all environments
-});
-```
-
-### Environment Configuration Reference
-
-The `environments` option can be configured with these properties:
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `enabled` | string[] | Array of environment names where the SDK should be enabled. If specified, the SDK will ONLY be enabled in these environments unless `default` is true. |
-| `disabled` | string[] | Array of environment names where the SDK should be disabled. Takes precedence over `enabled`. |
-| `default` | boolean | Default behavior for environments not explicitly listed (default: `true` = enabled) |
-
-### Environment Names
-
-Common environment names that can be used in configuration:
-- `production` (or `prod`)
-- `staging` (or `stage`)
-- `qa`
-- `testing` (or `test`)
-- `development` (or `dev`)
-- `local`
-
-### Debug Information
-
-In debug mode, the SDK will log which environment was detected and whether monitoring is enabled:
-
-```javascript
-const treblle = new Treblle({
-  sdkToken: 'YOUR_SDK_TOKEN',
-  apiKey: 'YOUR_API_KEY',
-  debug: true,
-  environments: {
-    disabled: ['development']
-  }
-});
-
-// Console output in development:
-// [Treblle SDK] Initialized in development environment. SDK disabled.
-```
-
-## Route Path Detection
-
-The SDK automatically captures API endpoint route patterns to help with API monitoring and documentation:
-
-### How It Works
-
-When an API request is processed, Treblle identifies the Express route pattern instead of the specific URL with parameters:
-
-```javascript
-// Original URL with parameter
-// GET /api/users/123/profile
-
-// Express route definition
-// app.get('/api/users/:id/profile', ...);
-
-// Detected route path in Treblle
-"route_path": "/users/:id/profile"
-```
-
-This helps you:
-- Group similar API requests together
-- Generate accurate API documentation
-- Track endpoint usage and performance
-- Identify problematic endpoints
-
-### Using Express Route Information
-
-The SDK extracts route patterns directly from Express route definitions, preserving parameter placeholders like `:id` or `:userId` exactly as defined in your routes.
-
-This gives you accurate endpoint grouping with zero configuration required.
 
 ## Error Handling
 
-The SDK can automatically capture and report detailed information about errors that occur in your API:
+The SDK automatically captures and reports detailed information about errors:
 
-### Using the Error Handler Middleware
+### Automatic Error Capture
 
-#### Express Integration (Recommended)
-
-```javascript
-const express = require('express');
-const { express: treblleExpress } = require('treblle-js').integrations;
-
-const app = express();
-
-// Configure Treblle once
-const treblleOptions = {
-  sdkToken: 'YOUR_SDK_TOKEN',
-  apiKey: 'YOUR_API_KEY'
-};
-
-// Apply the regular Treblle middleware
-app.use(treblleExpress.createTreblleMiddleware(treblleOptions));
-
-// Your routes and other middleware here
-app.get('/api/users', (req, res) => {
-  // API logic
-});
-
-// Add the Treblle error handler WITHOUT passing options again
-// It automatically uses the same instance as the middleware
-app.use(treblleExpress.createTreblleErrorHandler());
-
-// Your application's error handler comes after
-app.use((err, req, res, next) => {
-  res.status(500).json({ error: 'Server error' });
-});
-```
-
-#### Using the Treblle Class Directly
-
-```javascript
-const express = require('express');
-const Treblle = require('treblle-js');
-
-const app = express();
-const treblle = new Treblle({
-  sdkToken: 'YOUR_SDK_TOKEN',
-  apiKey: 'YOUR_API_KEY'
-});
-
-// Apply the regular Treblle middleware
-app.use(treblle.middleware());
-
-// Your routes and other middleware here
-app.get('/api/users', (req, res) => {
-  // API logic
-});
-
-// Add the Treblle error handler BEFORE your app's error handler
-// This ensures Treblle can capture error details
-app.use(treblle.errorHandler());
-
-// Your application's error handler comes after
-app.use((err, req, res, next) => {
-  res.status(500).json({ error: 'Server error' });
+```typescript
+export const POST = treblle.handler(async (request: Request) => {
+  try {
+    const body = await request.json();
+    // API logic that might throw
+    throw new Error('Something went wrong');
+  } catch (error) {
+    // Error is automatically captured by Treblle
+    return Response.json({ error: 'Internal server error' }, { status: 500 });
+  }
 });
 ```
 
@@ -397,35 +277,62 @@ app.use((err, req, res, next) => {
 
 For each error, Treblle captures:
 
-- **File**: Name of the JavaScript file where the error occurred
-- **Line**: Line number in the file where the error occurred
+- **File**: Name of the file where the error occurred
+- **Line**: Line number in the file where the error occurred  
 - **Message**: The error message
+- **Stack**: Sanitized stack trace (if available)
 
-This information is sent in the `errors` array of the Treblle payload, helping you quickly identify and fix issues in your API.
+## Advanced Usage
 
-### Example Error Output
+### Custom Field Masking
 
-```json
-{
-  "errors": [
-    {
-      "file": "users.controller.js",
-      "line": 42,
-      "message": "Cannot read property 'id' of undefined"
-    }
+```typescript
+const treblle = withTreblle({
+  sdkToken: process.env.TREBLLE_SDK_TOKEN!,
+  apiKey: process.env.TREBLLE_API_KEY!,
+  additionalMaskedFields: [
+    'my_secret_field',
+    'user.personal.phone',
+    'sensitive_data'
   ]
-}
+});
 ```
 
-### Handling Errors
+### Path Filtering
 
-The SDK intelligently extracts stack trace information while respecting your privacy and security. Only the minimal necessary information is sent - no sensitive data or full stack traces are transmitted.
+#### Excluding Paths
+
+```typescript
+const treblle = withTreblle({
+  sdkToken: process.env.TREBLLE_SDK_TOKEN!,
+  apiKey: process.env.TREBLLE_API_KEY!,
+  excludePaths: [
+    '/api/health',
+    '/api/metrics',
+    /^\/api\/internal\/.*/ // Exclude all internal APIs
+  ]
+});
+```
+
+#### Including Specific Paths
+
+```typescript
+const treblle = withTreblle({
+  sdkToken: process.env.TREBLLE_SDK_TOKEN!,
+  apiKey: process.env.TREBLLE_API_KEY!,
+  includePaths: [
+    '/api/public/*',
+    '/api/v1/*',
+    /^\/api\/users\/.*/
+  ]
+});
+```
 
 ## Handling Large Payloads
 
-The SDK automatically detects and handles exceptionally large objects (over 2MB) to prevent memory issues:
+The SDK automatically detects and handles exceptionally large objects (over 2MB by default) to prevent memory issues:
 
-```javascript
+```typescript
 // What Treblle receives for very large objects
 {
   "__type": "large_object",
@@ -433,15 +340,11 @@ The SDK automatically detects and handles exceptionally large objects (over 2MB)
 }
 ```
 
-## Handling Files and Non-JSON Responses
-
-The SDK intelligently handles various edge cases:
-
-### File Uploads
+## File Upload Detection
 
 When files are uploaded to your API, the SDK detects them and replaces the binary content with metadata:
 
-```javascript
+```typescript
 // Original request with file upload
 {
   "profile_image": <binary-data>
@@ -458,181 +361,150 @@ When files are uploaded to your API, the SDK detects them and replaces the binar
 }
 ```
 
-### File Downloads
+## Performance Optimizations
 
-When your API returns files or binary data, the SDK detects this and sends metadata instead:
+### Serverless Environments
 
-```javascript
-// What Treblle receives instead of binary data
-{
-  "__type": "file",
-  "size": 1024000,
-  "contentType": "application/pdf"
-}
-```
+The SDK is optimized for serverless environments like Vercel:
 
-### Non-JSON Responses
+- Minimal cold start impact
+- Lazy initialization
+- Efficient memory usage
+- Request deduplication
 
-If your API returns HTML or other non-JSON content, the SDK handles this gracefully:
-
-1. For HTML responses: Sends an empty object to Treblle
-2. For binary responses: Sends metadata about the binary content
-3. For malformed JSON: Logs the request but replaces the response with an empty object
-
-## Advanced Usage
-
-### Custom Field Masking
-
-You can add your own fields to be masked:
-
-```javascript
-const treblle = new Treblle({
-  sdkToken: 'YOUR_SDK_TOKEN',
-  apiKey: 'YOUR_API_KEY',
-  additionalMaskedFields: [
-    'my_secret_field',
-    'user.personal.phone',
-    'sensitive_data'
-  ]
-});
-```
-
-### Path Filtering
-
-You can control which API endpoints are monitored using path filtering:
-
-#### Excluding Paths
-
-Exclude health checks, metrics, and auth endpoints from monitoring:
-
-```javascript
-const treblle = new Treblle({
-  sdkToken: 'YOUR_SDK_TOKEN',
-  apiKey: 'YOUR_API_KEY',
-  excludePaths: [
-    '/health',
-    '/metrics',
-    '/api/auth',
-    /^\/admin\/.*/ // Exclude all paths starting with /admin/
-  ]
-});
-```
-
-#### Including Specific Paths
-
-Only monitor specific API versions or endpoints:
-
-```javascript
-const treblle = new Treblle({
-  sdkToken: 'YOUR_SDK_TOKEN',
-  apiKey: 'YOUR_API_KEY',
-  includePaths: [
-    '/api/v2/*',     // Include all v2 API routes
-    '/api/public/*', // Include all public API routes
-    /^\/api\/users\/.*/  // Include all user-related routes
-  ]
-});
-```
-
-#### Pattern Matching
-
-Path patterns can be specified in several ways:
-- Exact match: `/api/users`
-- Wildcard match: `/api/v1/*` (matches any path starting with `/api/v1/`)
-- Regular expressions: `/^\/api\/v[0-9]+\/.*/` (matches any versioned API path)
-
-### Using Environment Variables
-
-For better security, use environment variables:
-
-```javascript
-// .env file
-TREBLLE_SDK_TOKEN=your_sdk_token
-TREBLLE_API_KEY=your_api_key
-
-// app.js
-require('dotenv').config();
-
-const treblle = new Treblle({
-  sdkToken: process.env.TREBLLE_SDK_TOKEN,
-  apiKey: process.env.TREBLLE_API_KEY
-});
-```
-
-## How It Works
-
-The Treblle SDK:
-
-1. Captures the request data when it comes in
-2. Intercepts the response data before it's sent back
-3. Masks sensitive information according to your configuration
-4. Sends the data to Treblle servers using a fire-and-forget approach
-5. Does all of this with zero impact on your API's performance
-
-## Handling Errors
-
-The SDK is designed to handle all errors silently without affecting your API. If you want to see potential errors, enable debug mode:
-
-```javascript
-const treblle = new Treblle({
-  sdkToken: 'YOUR_SDK_TOKEN',
-  apiKey: 'YOUR_API_KEY',
-  debug: true // Errors will be logged to console
-});
-```
-
-## Framework Support
-
-This SDK officially supports:
-
-- **Express**: Full integration with comprehensive request/response monitoring and error tracking
-- **NestJS**: Full integration with middleware, exception filters, and interceptors
-- **Next.js (App Router)**: Route handler wrapper for monitoring API routes
-
-For NestJS specific instructions, see [README-NEST.md](./README-NEST.md).
-
-### Next.js (App Router) Integration
-
-The Next.js integration allows you to monitor API routes in the App Router with a simple wrapper:
+### Development vs Production
 
 ```typescript
-// app/api/users/route.ts
-import { withTreblle } from 'treblle-js/integrations/nextjs';
-
 const treblle = withTreblle({
   sdkToken: process.env.TREBLLE_SDK_TOKEN!,
   apiKey: process.env.TREBLLE_API_KEY!,
   debug: process.env.NODE_ENV !== 'production',
-});
-
-export const GET = treblle(async (request: Request, { params }) => {
-  // Your API logic here
-  return NextResponse.json({ users: [] });
-});
-
-export const POST = treblle(async (request: Request) => {
-  const body = await request.json();
-  // Create user logic
-  return NextResponse.json({ user: newUser }, { status: 201 });
+  // More detailed logging in development
+  maxBodySize: process.env.NODE_ENV === 'production' ? 1024 * 1024 : 5 * 1024 * 1024,
 });
 ```
 
-**Key features for Next.js:**
-- Automatic request/response monitoring
-- Error tracking with stack traces
-- File upload detection and metadata capture
-- Dynamic route parameter tracking (e.g., `/users/[id]` → `/users/{id}`)
-- Compatible with Node.js runtime (Edge runtime not supported)
+## Integration Examples
 
-**Environment Setup:**
+### Pages Router Integration
 
-Create a `.env.local` file:
+For older Next.js applications using Pages Router:
+
+```typescript
+// pages/api/users.ts
+import { withTreblle } from 'treblle-js/integrations/nextjs';
+import type { NextApiRequest, NextApiResponse } from 'next';
+
+const treblle = withTreblle({
+  sdkToken: process.env.TREBLLE_SDK_TOKEN!,
+  apiKey: process.env.TREBLLE_API_KEY!,
+});
+
+async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method === 'GET') {
+    return res.json({ users: [] });
+  }
+  
+  if (req.method === 'POST') {
+    const user = await createUser(req.body);
+    return res.status(201).json({ user });
+  }
+  
+  return res.status(405).json({ error: 'Method not allowed' });
+}
+
+export default treblle.pagesHandler(handler);
+```
+
+### TypeScript Support
+
+Full TypeScript support with proper Next.js types:
+
+```typescript
+import { withTreblle, TreblleNextHandler } from 'treblle-js/integrations/nextjs-enhanced';
+
+interface User {
+  id: number;
+  name: string;
+  email: string;
+}
+
+interface UserParams {
+  id: string;
+}
+
+const treblle = withTreblle({
+  sdkToken: process.env.TREBLLE_SDK_TOKEN!,
+  apiKey: process.env.TREBLLE_API_KEY!,
+});
+
+// Type-safe handler with parameter inference
+export const GET: TreblleNextHandler<UserParams> = treblle.handler(
+  async (request: Request, { params }) => {
+    // params.id is correctly typed as string
+    const user: User = await getUserById(params.id);
+    return Response.json({ user });
+  }
+);
+```
+
+## How It Works
+
+The Treblle SDK for Next.js:
+
+1. Wraps your API route handlers with monitoring logic
+2. Captures request data when it comes in
+3. Intercepts response data before it's sent back
+4. Masks sensitive information according to your configuration
+5. Sends the data to Treblle servers using a fire-and-forget approach
+6. Does all of this with zero impact on your API's performance
+7. Handles Next.js-specific patterns like dynamic routes and route groups
+
+## Debugging
+
+Enable debug mode to see potential errors and monitoring activity:
+
+```typescript
+const treblle = withTreblle({
+  sdkToken: process.env.TREBLLE_SDK_TOKEN!,
+  apiKey: process.env.TREBLLE_API_KEY!,
+  debug: true // Errors and activity will be logged to console
+});
+```
+
+## Best Practices
+
+1. **Environment Variables**: Always use environment variables for sensitive credentials
+2. **Path Filtering**: Use `excludePaths` to avoid monitoring health checks and internal endpoints
+3. **Field Masking**: Add any additional sensitive fields to `additionalMaskedFields`
+4. **Error Handling**: Let the SDK handle error capture automatically, but implement proper error boundaries
+5. **Performance**: Use the enhanced integration for production applications with many features
+6. **Middleware**: Use middleware integration for cross-cutting concerns like authentication and rate limiting
+
+## Next.js Deployment
+
+### Vercel
+
+The SDK works seamlessly with Vercel deployments:
+
 ```bash
-TREBLLE_SDK_TOKEN=your_sdk_token_here
-TREBLLE_API_KEY=your_api_key_here
+# .env.local (for development)
+TREBLLE_SDK_TOKEN=your_token
+TREBLLE_API_KEY=your_key
+
+# Add to Vercel environment variables in dashboard
 ```
 
-For more detailed examples, see [examples/nextjs-example.ts](./examples/nextjs-example.ts).
+### Other Platforms
+
+Compatible with all major Next.js hosting platforms:
+
+- Vercel
+- Netlify
+- AWS Amplify
+- Railway
+- Heroku
+- Self-hosted
 
 ## Contributing
 
@@ -644,4 +516,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Support
 
-If you have any questions or issues, please [open an issue](https://github.com/Treblle/treblle-js/issues) or contact the Treblle team.
+If you have any questions or issues, please [open an issue](https://github.com/timpratim/treblle-js/issues) or contact the Treblle team.
