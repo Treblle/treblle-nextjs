@@ -14,7 +14,9 @@ import {
   calculateResponseSize, 
   extractRoutePath
 } from './utils';
-import * as https from 'https';
+import { processPayloadWithSizeCheck, checkPayloadSize } from './core/payload-size';
+import { getSdkVersionFloat } from './core/version';
+import { sendToTreblle } from './core/transport';
 
 // Constants
 const TREBLLE_ENDPOINTS = [
@@ -23,9 +25,7 @@ const TREBLLE_ENDPOINTS = [
   'https://sicario.treblle.com'
 ];
 
-// Import integrations for re-export
-import * as expressIntegration from './integrations/express';
-// import * as nestjsIntegration from './integrations/nestjs';
+
 
 /**
  * @class Treblle
@@ -48,15 +48,17 @@ class Treblle {
   constructor(options: TreblleOptions) {
     // Validate required configuration
     if (!options.sdkToken) {
+      console.error('Treblle SDK requires an SDK token to function properly');
       this._handleError(new Error('Treblle SDK requires an SDK token'));
       return;
     }
 
     if (!options.apiKey) {
+      console.error('Treblle SDK requires an API key to function properly');
       this._handleError(new Error('Treblle SDK requires an API key'));
       return;
     }
-
+    
     this.options = options; // Store options for later use
     this.sdkToken = options.sdkToken;
     this.apiKey = options.apiKey;
@@ -72,6 +74,14 @@ class Treblle {
     if (this.debug) {
       console.log(`[Treblle SDK] Initialized in ${getCurrentEnvironment()} environment. SDK ${this.enabled ? 'enabled' : 'disabled'}.`);
     }
+  }
+
+  /**
+   * @method isEnabled
+   * @description Returns whether the SDK is enabled for the current environment
+   */
+  public isEnabled(): boolean {
+    return this.enabled;
   }
 
   /**
@@ -245,15 +255,69 @@ class Treblle {
         
         // Parse request URL
         const protocol = req.protocol || (req.connection && req.connection.encrypted ? 'https' : 'http');
-        const host = req.get('host') || req.headers.host;
+        const host = req.get ? req.get('host') : (req.headers?.host);
         const url = `${protocol}://${host}${req.originalUrl || req.url}`;
+        
+        // Build query object
+        let query: Record<string, string> = {};
+        try {
+          if (req.query) {
+            const q: Record<string, any> = req.query;
+            const obj: Record<string, string> = {};
+            Object.keys(q).forEach((k) => {
+              const v = q[k];
+              if (Array.isArray(v)) obj[k] = v.join(',');
+              else if (v === undefined || v === null) obj[k] = '';
+              else obj[k] = String(v);
+            });
+            query = obj;
+          } else if (url) {
+            const u = new URL(url);
+            const obj: Record<string, string> = {};
+            u.searchParams.forEach((value, key) => {
+              if (obj[key]) obj[key] = `${obj[key]},${value}`; else obj[key] = value;
+            });
+            query = obj;
+          }
+        } catch (_e) {
+          query = {};
+        }
+        
+        // Check payload sizes for debugging/reporting
+        if (self.debug) {
+          const requestSizeInfo = checkPayloadSize(requestBody, {
+            maxSize: self.options.maxPayloadSize,
+            warningSize: self.options.payloadWarningSize,
+            enableEstimation: self.options.enableSizeEstimation
+          });
+          
+          const responseSizeInfo = checkPayloadSize(responseBody, {
+            maxSize: self.options.maxPayloadSize,
+            warningSize: self.options.payloadWarningSize,
+            enableEstimation: self.options.enableSizeEstimation
+          });
+          
+          if (requestSizeInfo.isLarge) {
+            console.log(`[Treblle SDK] Large request body detected: ${requestSizeInfo.size} bytes`);
+            if (requestSizeInfo.exceedsLimit) {
+              console.log(`[Treblle SDK] Request body exceeds limit, replaced with metadata`);
+            }
+          }
+          
+          if (responseSizeInfo.isLarge) {
+            console.log(`[Treblle SDK] Large response body detected: ${responseSizeInfo.size} bytes`);
+            if (responseSizeInfo.exceedsLimit) {
+              console.log(`[Treblle SDK] Response body exceeds limit, replaced with metadata`);
+            }
+          }
+        }
         
         // Build the payload according to Treblle specification
         const payload = {
           api_key: self.sdkToken,
           project_id: self.apiKey,
-          sdk: 'nodejs',
-          version: '1.0.0',
+          sdk: 'nextjs',
+          version: getSdkVersionFloat(),
           data: {
             server: {
               ip: getServerIp(),
@@ -277,14 +341,29 @@ class Treblle {
               user_agent: req.headers['user-agent'] || '',
               method: req.method,
               headers: maskSensitiveData(req.headers, self.options.additionalMaskedFields),
-              body: maskSensitiveData(requestBody, self.options.additionalMaskedFields)
+              query: maskSensitiveData(query, self.options.additionalMaskedFields),
+              body: processPayloadWithSizeCheck(
+                maskSensitiveData(requestBody, self.options.additionalMaskedFields),
+                {
+                  maxSize: self.options.maxPayloadSize,
+                  warningSize: self.options.payloadWarningSize,
+                  enableEstimation: self.options.enableSizeEstimation
+                }
+              )
             },
             response: {
               headers: maskSensitiveData(responseHeaders, self.options.additionalMaskedFields),
               code: res.statusCode,
               size: calculateResponseSize(responseBody, res),
               load_time: duration,
-              body: maskSensitiveData(responseBody, self.options.additionalMaskedFields)
+              body: processPayloadWithSizeCheck(
+                maskSensitiveData(responseBody, self.options.additionalMaskedFields),
+                {
+                  maxSize: self.options.maxPayloadSize,
+                  warningSize: self.options.payloadWarningSize,
+                  enableEstimation: self.options.enableSizeEstimation
+                }
+              )
             },
             errors: res._treblleErrors || []
           }
@@ -382,10 +461,9 @@ class Treblle {
    * @param payload - The payload to send
    */
   public capture(payload: any): void {
-    // Send asynchronously (fire and forget)
-    setImmediate(() => {
-      this._sendPayload(payload);
-    });
+    if (!this.enabled) return;
+    // Fire-and-forget; initiate send immediately (non-blocking)
+    this._sendPayload(payload);
   }
 
   /**
@@ -399,125 +477,23 @@ class Treblle {
       // Select random endpoint
       const endpoint = TREBLLE_ENDPOINTS[Math.floor(Math.random() * TREBLLE_ENDPOINTS.length)];
       
-      if (this.debug) {
-        console.log(`[Treblle SDK] Sending payload to endpoint: ${endpoint}`);
-        console.log(`[Treblle SDK] Payload method: ${payload.data.request.method}`);
-        console.log(`[Treblle SDK] Payload URL: ${payload.data.request.url}`);
-        console.log(`[Treblle SDK] Payload route_path: ${payload.data.request.route_path}`);
-        console.log(`[Treblle SDK] Response code: ${payload.data.response.code}`);
-      }
-      
-      // Parse URL
-      const url = new URL(endpoint);
+      // Intentionally avoid verbose logging here to prevent noisy async logs in tests
       
       // Validate URL is HTTPS
+      const url = new URL(endpoint);
       if (url.protocol !== 'https:') {
         this._handleError(new Error('Treblle SDK only supports HTTPS endpoints'));
         return;
       }
-      
-      // Prepare request options
-      const options = {
-        method: 'POST',
-        hostname: url.hostname,
-        path: url.pathname + url.search,
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': this.sdkToken
-        }
-      };
-      
-      if (this.debug) {
-        console.log(`[Treblle SDK] Request options prepared: ${JSON.stringify(options)}`);
-      }
-      
-      // Create HTTPS request
-      const req = https.request(options, (res) => {
-        if (this.debug) {
-          console.log(`[Treblle SDK] Received response with status: ${res.statusCode}`);
-        }
-        
-        let responseData = '';
-        
-        // Collect response data if in debug mode
-        if (this.debug) {
-          res.on('data', (chunk) => {
-            responseData += chunk;
-          });
-          
-          res.on('end', () => {
-            if (responseData) {
-              try {
-                const parsedResponse = JSON.parse(responseData);
-                console.log(`[Treblle SDK] Response from Treblle API: ${JSON.stringify(parsedResponse)}`);
-              } catch (e) {
-                console.log(`[Treblle SDK] Raw response from Treblle API: ${responseData}`);
-              }
-            } else {
-              console.log(`[Treblle SDK] No response body from Treblle API`);
-            }
-          });
-        } else {
-          // In non-debug, just ignore response data
-          res.on('data', () => {});
-          res.on('end', () => {});
-        }
+
+      // Use runtime-aware transport (Edge-safe)
+      void sendToTreblle({
+        endpoint,
+        sdkToken: this.sdkToken,
+        payload,
+        debug: this.debug,
+        timeoutMs: 5000,
       });
-      
-      // Handle request errors silently
-      req.on('error', (error: Error) => {
-        this._handleError(error);
-        if (this.debug) {
-          console.error(`[Treblle SDK] Error sending request: ${error.message}`);
-        }
-      });
-      
-      // Set reasonable timeout
-      req.setTimeout(5000, () => {
-        req.destroy();
-        if (this.debug) {
-          console.error(`[Treblle SDK] Request timeout after 5000ms`);
-        }
-        this._handleError(new Error('Treblle request timeout'));
-      });
-      
-      // Helper function to ensure proper JSON formatting
-      const safeStringify = (obj: any): string => {
-        return JSON.stringify(obj, (_key, value) => {
-          // If the value is already a string that looks like JSON, parse it 
-          // to prevent double-escaping
-          if (typeof value === 'string') {
-            try {
-              // Check if this string appears to be JSON
-              if ((value.startsWith('{') && value.endsWith('}')) || 
-                  (value.startsWith('[') && value.endsWith(']'))) {
-                // Try to parse it
-                const parsed = JSON.parse(value);
-                // If successful, return the parsed object instead of the string
-                return parsed;
-              }
-            } catch (e) {
-              // Not valid JSON, leave as string
-            }
-          }
-          return value;
-        });
-      };
-      
-      // Get the serialized payload
-      const serializedPayload = safeStringify(payload);
-      
-      if (this.debug) {
-        console.log(`[Treblle SDK] Payload size: ${serializedPayload.length} bytes`);
-      }
-      
-      // Send data with better JSON handling
-      req.write(serializedPayload);
-      req.end();
-      
-      if (this.debug) {
-        console.log(`[Treblle SDK] Request sent`);
-      }
     } catch (error: unknown) {
       if (error instanceof Error) {
         this._handleError(error);
@@ -618,16 +594,6 @@ class Treblle {
     }
   }
 }
-
-// Export integrations directly as named exports
-export const express = expressIntegration;
-// export const nestjs = nestjsIntegration;
-
-// Export the integrations object for backwards compatibility
-export const integrations = {
-  express: expressIntegration,
-  // nestjs: nestjsIntegration
-};
 
 // Export the Treblle class as both default and named export
 export { Treblle };

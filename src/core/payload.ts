@@ -6,6 +6,8 @@
 import { TreblleOptions, TreblleError } from '../types';
 import { maskSensitiveData } from '../masking';
 import { getServerIp, calculateResponseSize } from '../utils';
+import { processPayloadWithSizeCheck, PayloadSizeOptions } from './payload-size';
+import { getSdkVersionFloat } from './version';
 
 export interface PayloadRequest {
   timestamp: string;
@@ -15,6 +17,7 @@ export interface PayloadRequest {
   user_agent: string;
   method: string;
   headers: Record<string, any>;
+  query: Record<string, string>;
   body: any;
 }
 
@@ -34,6 +37,7 @@ export interface PayloadInput {
   errors: TreblleError[];
   options: TreblleOptions;
   responseObject?: any; // For calculateResponseSize compatibility
+  sizeOptions?: PayloadSizeOptions; // Payload size checking options
 }
 
 /**
@@ -42,24 +46,39 @@ export interface PayloadInput {
  * @returns Treblle API payload
  */
 export function buildTrebllePayload(input: PayloadInput): any {
+  const sizeOptions = input.sizeOptions || {};
+  
+  // Process request and response bodies with size checking
+  const processedRequestBody = processPayloadWithSizeCheck(
+    maskSensitiveData(input.request.body, input.options.additionalMaskedFields),
+    sizeOptions
+  );
+  
+  const processedResponseBody = processPayloadWithSizeCheck(
+    maskSensitiveData(input.response.body, input.options.additionalMaskedFields),
+    sizeOptions
+  );
+  
+  const hasProcess = typeof process !== 'undefined';
+
   return {
     api_key: input.sdkToken,
     project_id: input.apiKey,
-    sdk: 'nodejs',
-    version: '1.0.0',
+    sdk: 'nextjs',
+    version: getSdkVersionFloat(),
     data: {
       server: {
         ip: getServerIp(),
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         os: {
-          name: process.platform,
-          release: process.release.name,
-          architecture: process.arch
+          name: hasProcess ? (process as any).platform : 'edge',
+          release: hasProcess ? ((process as any).release?.name || '') : '',
+          architecture: hasProcess ? (process as any).arch : 'unknown'
         },
-        software: process.version,
+        software: hasProcess ? (process as any).version : 'edge',
         language: {
           name: "nodejs",
-          version: process.version
+          version: hasProcess ? (process as any).version : 'edge'
         }
       },
       request: {
@@ -70,7 +89,8 @@ export function buildTrebllePayload(input: PayloadInput): any {
         user_agent: input.request.user_agent,
         method: input.request.method,
         headers: maskSensitiveData(input.request.headers, input.options.additionalMaskedFields),
-        body: maskSensitiveData(input.request.body, input.options.additionalMaskedFields)
+        query: maskSensitiveData(input.request.query, input.options.additionalMaskedFields),
+        body: processedRequestBody
       },
       response: {
         headers: maskSensitiveData(input.response.headers, input.options.additionalMaskedFields),
@@ -79,7 +99,7 @@ export function buildTrebllePayload(input: PayloadInput): any {
           calculateResponseSize(input.response.body, input.responseObject) : 
           input.response.size,
         load_time: input.response.load_time,
-        body: maskSensitiveData(input.response.body, input.options.additionalMaskedFields)
+        body: processedResponseBody
       },
       errors: input.errors
     }

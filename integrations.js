@@ -3,7 +3,7 @@
  * @description Entry point for the integrations subpath
  * 
  * This file enables importing integrations directly via:
- * import { nestjs } from 'treblle-js/integrations';
+ * import { nextjs } from 'treblle-nextjs/integrations';
  */
 
 // Get the integrations from the dist directory

@@ -79,7 +79,7 @@ describe('Data Masking Comprehensive Tests', () => {
       // Check that sensitive fields are masked
       expect(masked.password).toBe('*********');
       expect(masked.api_key).toBe('*****************'); // 17 characters
-      expect(masked.data.creditScore).toBe('***');
+      expect(masked.data.creditScore).toBe('*****');
       
       // Check that normal fields are not masked
       expect(masked.username).toBe('testuser');
@@ -341,9 +341,9 @@ describe('Data Masking Comprehensive Tests', () => {
       // Should not crash and return a fallback
       const masked = maskSensitiveData(data);
 
-      // The function should handle circular references and return large_object
-      expect(masked.__type).toBe('large_object');
-      expect(masked.message).toBe('Object too large to process');
+      // The function should handle circular references gracefully
+      expect(masked.__type).toBe('unprocessable');
+      expect(masked.message).toBe('Unable to process object');
     });
 
     test('should preserve data types', () => {

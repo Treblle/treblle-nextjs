@@ -4,6 +4,7 @@
  */
 
 import { DEFAULT_MASKED_FIELDS } from './types';
+import { checkPayloadSize, createPayloadReplacement } from './core/payload-size';
 
 /**
  * @function maskSensitiveData
@@ -25,22 +26,11 @@ export function maskSensitiveData(data: any, additionalFields: string[] = []): a
     return { __type: 'binary', size: data.length };
   }
   
-  // Function to determine if an object is too large or complex to process
-  const isLargeObject = (obj: any): boolean => {
-    try {
-      const json = JSON.stringify(obj);
-      // If object is larger than ~2MB, consider it too large
-      return json.length > 2000000;
-    } catch (e) {
-      // If object can't be stringified, it's likely too complex
-      return true;
-    }
-  };
+  // Check payload size before processing using memory-efficient approach
+  const sizeInfo = checkPayloadSize(data, { maxSize: 5 * 1024 * 1024 });
   
-  // Check payload size before processing
-  if (isLargeObject(data)) {
-    // Return a placeholder for large objects
-    return { __type: 'large_object', message: 'Object too large to process' };
+  if (sizeInfo.exceedsLimit) {
+    return createPayloadReplacement(data, sizeInfo);
   }
   
   // Create a deep copy to avoid modifying original
