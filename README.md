@@ -1,520 +1,301 @@
-# Treblle SDK for Next.js
+# Treblle - API Intelligence Platform
 
-Official Treblle SDK for Next.js applications. Monitor API requests in real-time with zero performance impact.
+[![Treblle API Intelligence](https://github.com/user-attachments/assets/b268ae9e-7c8a-4ade-95da-b4ac6fce6eea)](https://treblle.com)
 
-## Features
+[Website](http://treblle.com/) • [Documentation](https://docs.treblle.com/) • [Pricing](https://treblle.com/pricing)
 
-- 🔄 Real-time API monitoring for Next.js App Router and Pages Router
-- 🔒 Automatic sensitive data masking
-- 🚀 Zero performance impact with fire-and-forget approach
-- 🛡️ Built with security and privacy in mind
-- 🪶 Lightweight with minimal dependencies
-- 🔌 Easy integration with Next.js API routes and middleware
-- 🧩 Full TypeScript support with Next.js types
-- 📦 Smart handling of file uploads and downloads
-- 🧠 Intelligent processing of streaming responses
-- 🛑 Automatic detection and handling of large payloads
-- 🐛 Detailed error tracking with file and line information
-- 🔍 Automatic dynamic route detection (`[id]`, `[...slug]`)
-- 🌐 Edge Runtime support
-- ⚡ Serverless environment optimizations
-- 🌎 Environment-based configuration
+Treblle is an API intelligence platfom that helps developers, teams and organizations understand their APIs from a single integration point.
+
+---
+
+## Treblle Next.js SDK
+
+Treblle Next.js SDK that supports Pages Router (`pages/api`) and App Router (`app/api`) supported
+
+## Requirements
+ 
+- Node.js: Follows your Next.js version requirements (Node 18+ recommended)
+- Runtimes: Node.js and Edge (see Edge notes)
 
 ## Installation
 
 ```bash
-npm install treblle-nextjs --save
+npm install @treblle/next
+# or
+pnpm add @treblle/next
+# or
+yarn add @treblle/next
+```
+
+Keep keys server-only. Do not expose with `NEXT_PUBLIC_`.
+
+## Get Your Keys
+
+1. Create a free account: https://treblle.com
+2. Create a project to get:
+   - `sdkToken`
+   - `apiKey`
+3. Add to your `.env` (server-only):
+
+```env
+TREBLLE_SDK_TOKEN=your_sdk_token
+TREBLLE_API_KEY=your_api_key
 ```
 
 ## Quick Start
 
-### Basic App Router Integration
+Pick your routing setup:
 
-```typescript
-// app/api/users/route.ts
-import { withTreblle } from 'treblle-nextjs/integrations/nextjs';
+- Pages Router: wrap `pages/api/*` handlers
+- App Router: wrap `app/api/*` route method exports
+- Middleware (optional): observe all requests at the edge (with body limits)
 
-const treblle = withTreblle({
+### Pages Router (pages/api)
+
+`pages/api/users.ts`
+
+```ts
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { nextTreblle } from '@treblle/next';
+
+const treblle = nextTreblle({
   sdkToken: process.env.TREBLLE_SDK_TOKEN!,
   apiKey: process.env.TREBLLE_API_KEY!,
+  // debug: process.env.NODE_ENV !== 'production',
+});
+
+async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method === 'GET') return res.status(200).json({ users: [] });
+  return res.status(405).json({ error: 'Method not allowed' });
+}
+
+export default treblle(handler);
+```
+
+JavaScript version:
+
+```js
+import { nextTreblle } from '@treblle/next';
+
+const treblle = nextTreblle({
+  sdkToken: process.env.TREBLLE_SDK_TOKEN,
+  apiKey: process.env.TREBLLE_API_KEY,
+});
+
+async function handler(req, res) {
+  if (req.method === 'GET') return res.status(200).json({ users: [] });
+  return res.status(405).json({ error: 'Method not allowed' });
+}
+
+export default treblle(handler);
+```
+
+### App Router (app/api)
+
+`app/api/users/route.ts`
+
+```ts
+import { NextResponse } from 'next/server';
+import { nextTreblle } from '@treblle/next';
+
+const treblle = nextTreblle({
+  sdkToken: process.env.TREBLLE_SDK_TOKEN!,
+  apiKey: process.env.TREBLLE_API_KEY!,
+  // debug: process.env.NODE_ENV !== 'production',
+});
+
+export const GET = treblle(async () => {
+  return NextResponse.json({ users: [] });
+});
+
+export const POST = treblle(async (req: Request) => {
+  const body = await req.json();
+  return NextResponse.json({ success: true, user: body }, { status: 201 });
+});
+
+// To run on Edge (optional):
+// export const runtime = 'edge';
+```
+
+### Optional: Global Middleware (Edge)
+
+Use only if you want coarse-grained visibility on every request. Middleware can’t read bodies for non‑GET methods, so wrap API handlers for full detail.
+
+```ts
+// middleware.ts
+import { NextResponse } from 'next/server';
+import { nextMiddlewareTreblle } from '@treblle/next';
+
+const treblle = nextMiddlewareTreblle({
+  sdkToken: process.env.TREBLLE_SDK_TOKEN!,
+  apiKey: process.env.TREBLLE_API_KEY!,
+  // blocklistPaths: [/^\/_next\//, 'static', 'images'],
+});
+
+export default treblle(async () => NextResponse.next());
+
+// Limit to API routes (optional):
+// export const config = { matcher: ['/api/:path*'] };
+```
+
+## Configuration
+
+Pass these options to `nextTreblle` or `nextMiddlewareTreblle`:
+
+- `sdkToken`: Your Treblle SDK token (required)
+- `apiKey`: Your Treblle API key (required)
+- `additionalFieldsToMask`: Extra field names to mask (string[])
+- `blocklistPaths`: Paths to exclude (string prefixes or a RegExp)
+- `ignoreDefaultBlockedPaths`: Disable default static/noise filters (boolean; default `false`)
+- `debug`: Print Treblle errors to console (boolean; default `false`)
+
+Example:
+
+```ts
+const treblle = nextTreblle({
+  sdkToken: process.env.TREBLLE_SDK_TOKEN!,
+  apiKey: process.env.TREBLLE_API_KEY!,
+  additionalFieldsToMask: ['customSecret', 'internalId'],
+  blocklistPaths: ['admin', /^\/api\/v1\/internal/],
+  ignoreDefaultBlockedPaths: false,
   debug: process.env.NODE_ENV !== 'production',
-});
-
-export const GET = treblle(async (request: Request, { params }) => {
-  // Your API logic here
-  const users = await getUsers();
-  return Response.json({ users });
-});
-
-export const POST = treblle(async (request: Request) => {
-  const body = await request.json();
-  const user = await createUser(body);
-  return Response.json({ user }, { status: 201 });
 });
 ```
 
+Production-only enablement:
 
-### Middleware Integration
+```ts
+const maybeTreblle = process.env.NODE_ENV === 'production'
+  ? nextTreblle({ sdkToken: process.env.TREBLLE_SDK_TOKEN!, apiKey: process.env.TREBLLE_API_KEY! })
+  : ((h: any) => h); // no-op passthrough
 
-Create a `middleware.ts` file in your project root:
+export const GET = maybeTreblle(async () => NextResponse.json({ ok: true }));
+```
 
-```typescript
-// middleware.ts
-import { createMiddlewareWrapper } from 'treblle-nextjs/integrations/nextjs';
-import { NextResponse } from 'next/server';
+## Defaults
 
-const withTreblle = createMiddlewareWrapper({
-  sdkToken: process.env.TREBLLE_SDK_TOKEN!,
-  apiKey: process.env.TREBLLE_API_KEY!,
-});
+### Masked Fields
 
-export const middleware = withTreblle(async (request) => {
-  // Your middleware logic here
-  return NextResponse.next();
-});
+Automatically masked in request/response bodies:
 
-export const config = {
-  matcher: [
-    '/api/:path*',
-    '/((?!_next/static|_next/image|favicon.ico).*)',
-  ],
+- `password`, `pwd`, `secret`, `password_confirmation`, `passwordConfirmation`
+- `cc`, `card_number`, `cardNumber`, `ccv`
+- `ssn`
+- `credit_score`, `creditScore`
+
+Add more via `additionalFieldsToMask`.
+
+### Blocked Paths
+
+Ignored by default to reduce noise:
+
+- Files: `favicon.ico`, `robots.txt`, `sitemap.xml`, `manifest.json`, `sw.js`, `service-worker.js`, `browserconfig.xml`, `crossdomain.xml`, `ads.txt`, `apple-touch-icon*`
+- Directories: `/.well-known/`, `/static/`, `/assets/`, `/public/`, `/images/`, `/css/`, `/js`
+- Extensions: `.css`, `.js`, `.png`, `.jpg`, `.jpeg`, `.gif`, `.svg`, `.ico`, `.woff`, `.woff2`, `.ttf`, `.eot`
+
+Override example:
+
+```ts
+ignoreDefaultBlockedPaths: true,
+blocklistPaths: ['favicon.ico'],
+```
+
+## Edge Notes
+
+- App Router handlers can opt into Edge with `export const runtime = 'edge'`
+- Middleware runs at the edge; bodies of non‑GET requests are not readable there
+- Prefer wrapping route handlers for full body and error detail
+
+## API Reference
+
+- `nextTreblle(config) -> (handler) => wrappedHandler`
+  - Wraps Next.js API handlers (Pages) and route method handlers (App Router)
+  - Works in Node and Edge (per handler runtime)
+
+- `nextMiddlewareTreblle(config) -> (mw) => wrappedMiddleware`
+  - Wraps `middleware.ts` for coarse-grained, global observation (Edge)
+
+Config type (informal):
+
+```ts
+type NextTreblleConfig = {
+  sdkToken: string;
+  apiKey: string;
+  additionalFieldsToMask?: string[];
+  blocklistPaths?: (string | RegExp)[];
+  ignoreDefaultBlockedPaths?: boolean;
+  debug?: boolean;
 };
 ```
 
-## Environment Setup
+## Troubleshooting
 
-Create a `.env.local` file in your project root:
+- Enable logs: set `debug: true` and check server output
+- Verify keys: `sdkToken` and `apiKey` from your Treblle dashboard
+- Start simple: add a `GET /api/health` and hit it
+- Check blocking: ensure your route isn’t blocked by defaults or `blocklistPaths`
+- Edge body missing: use handler wrapping instead of middleware for body capture
 
-```bash
-TREBLLE_SDK_TOKEN=your_sdk_token_here
-TREBLLE_API_KEY=your_api_key_here
-NODE_ENV=development
-```
+## Security Notes
 
-## Configuration Options
+- Store keys in server-only env vars; never use `NEXT_PUBLIC_*`
+- Avoid logging secrets; use `additionalFieldsToMask` for custom sensitive fields
 
-The Treblle SDK accepts the following configuration options:
 
-| Option | Type | Required | Description |
-|--------|------|----------|-------------|
-| `sdkToken` | string | Yes | Your Treblle SDK token obtained during registration |
-| `apiKey` | string | Yes | Your Treblle API key |
-| `additionalMaskedFields` | string[] | No | Additional field names to mask beyond the default ones |
-| `debug` | boolean | No | Enable debug mode to log errors to console (default: `false`) |
-| `excludePaths` | (string \| RegExp)[] | No | Paths to exclude from monitoring (e.g., `['/health', '/metrics']`) |
-| `includePaths` | (string \| RegExp)[] | No | Paths to include in monitoring (e.g., `['/api/v1/*']`) |
-| `enabled` | boolean | No | Explicitly enable or disable the SDK regardless of environment |
-| `environments` | object \| boolean | No | Environment-specific configuration |
-| `enableEdgeRuntime` | boolean | No | Enable Edge Runtime support (enhanced integration only) |
-| `handleStreaming` | boolean | No | Handle streaming responses (enhanced integration only) |
-| `maxBodySize` | number | No | Maximum body size to process in bytes (default: 2MB) |
+## License
 
-## Next.js Specific Features
+MIT © Treblle Inc.
 
-### Dynamic Route Detection
+---
 
-The SDK automatically detects and normalizes Next.js dynamic routes:
+### Copy‑Paste Templates
 
-```typescript
-// File: app/api/users/[id]/route.ts
-// URL: /api/users/123
-// Detected route: /api/users/[id]
+Pages Router:
 
-// File: app/api/blog/[...slug]/route.ts  
-// URL: /api/blog/2023/my-post
-// Detected route: /api/blog/[...slug]
-
-// File: app/api/(auth)/login/route.ts
-// URL: /api/login  
-// Detected route: /api/(auth)/login
-```
-
-### Route Groups Support
-
-Route groups are automatically handled:
-
-```typescript
-// File: app/api/(auth)/login/route.ts
-// File: app/api/(public)/health/route.ts
-// Groups are preserved in route detection
-```
-
-### Edge Runtime Compatibility
-
-The SDK works with both Node.js and Edge runtimes:
-
-```typescript
-// app/api/edge-example/route.ts
-export const runtime = 'edge';
-
-import { createTreblleWrapper } from 'treblle-nextjs/integrations/nextjs';
-
-const treblle = createTreblleWrapper({
-  sdkToken: process.env.TREBLLE_SDK_TOKEN!,
-  apiKey: process.env.TREBLLE_API_KEY!,
-  enableEdgeRuntime: true, // Optimizes for Edge runtime
-});
-
-export const GET = treblle.handler(async (request) => {
-  return Response.json({ message: 'Edge function monitored!' });
-});
-```
-
-### Streaming Response Support
-
-Handle Server-Sent Events and streaming responses:
-
-```typescript
-export const GET = treblle.handler(async (request) => {
-  const stream = new ReadableStream({
-    start(controller) {
-      // Stream data
-      controller.enqueue('data chunk');
-      controller.close();
-    },
-  });
-
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/plain',
-      'Transfer-Encoding': 'chunked',
-    },
-  });
-});
-```
-
-## Default Masked Fields
-
-The following fields are automatically masked for security:
-
-- password
-- pwd
-- secret
-- password_confirmation
-- passwordConfirmation
-- cc
-- card_number
-- cardNumber
-- ccv
-- ssn
-- credit_score
-- creditScore
-- api_key
-
-Each character in these fields will be replaced with `*` to keep the same length but hide the actual values.
-
-## Environment-Based Configuration
-
-The SDK can detect your application's environment and adjust its behavior accordingly:
-
-### Default Behavior
-
-By default, the SDK is **enabled in all environments**. This ensures monitoring is always active unless explicitly disabled.
-
-### Environment Configuration Examples
-
-```typescript
-const treblle = withTreblle({
-  sdkToken: process.env.TREBLLE_SDK_TOKEN!,
-  apiKey: process.env.TREBLLE_API_KEY!,
-  environments: {
-    // Never monitor in test environments
-    disabled: ['test', 'ci'],
-    
-    // Only monitor in these environments
-    enabled: ['production', 'staging', 'development'],
-    
-    // Default for unlisted environments
-    default: true
-  }
-});
-```
-
-### Disabling in Specific Environments
-
-```typescript
-const treblle = withTreblle({
-  sdkToken: process.env.TREBLLE_SDK_TOKEN!,
-  apiKey: process.env.TREBLLE_API_KEY!,
-  environments: {
-    disabled: ['development', 'test']
-  }
-});
-```
-
-### Enabling Only in Production
-
-```typescript
-const treblle = withTreblle({
-  sdkToken: process.env.TREBLLE_SDK_TOKEN!,
-  apiKey: process.env.TREBLLE_API_KEY!,
-  environments: {
-    enabled: ['production'],
-    default: false
-  }
-});
-```
-
-## Error Handling
-
-The SDK automatically captures and reports detailed information about errors:
-
-### Automatic Error Capture
-
-```typescript
-export const POST = treblle.handler(async (request: Request) => {
-  try {
-    const body = await request.json();
-    // API logic that might throw
-    throw new Error('Something went wrong');
-  } catch (error) {
-    // Error is automatically captured by Treblle
-    return Response.json({ error: 'Internal server error' }, { status: 500 });
-  }
-});
-```
-
-### Error Information Captured
-
-For each error, Treblle captures:
-
-- **File**: Name of the file where the error occurred
-- **Line**: Line number in the file where the error occurred  
-- **Message**: The error message
-- **Stack**: Sanitized stack trace (if available)
-
-## Advanced Usage
-
-### Custom Field Masking
-
-```typescript
-const treblle = withTreblle({
-  sdkToken: process.env.TREBLLE_SDK_TOKEN!,
-  apiKey: process.env.TREBLLE_API_KEY!,
-  additionalMaskedFields: [
-    'my_secret_field',
-    'user.personal.phone',
-    'sensitive_data'
-  ]
-});
-```
-
-### Path Filtering
-
-#### Excluding Paths
-
-```typescript
-const treblle = withTreblle({
-  sdkToken: process.env.TREBLLE_SDK_TOKEN!,
-  apiKey: process.env.TREBLLE_API_KEY!,
-  excludePaths: [
-    '/api/health',
-    '/api/metrics',
-    /^\/api\/internal\/.*/ // Exclude all internal APIs
-  ]
-});
-```
-
-#### Including Specific Paths
-
-```typescript
-const treblle = withTreblle({
-  sdkToken: process.env.TREBLLE_SDK_TOKEN!,
-  apiKey: process.env.TREBLLE_API_KEY!,
-  includePaths: [
-    '/api/public/*',
-    '/api/v1/*',
-    /^\/api\/users\/.*/
-  ]
-});
-```
-
-## Handling Large Payloads
-
-The SDK automatically detects and handles exceptionally large objects (over 2MB by default) to prevent memory issues:
-
-```typescript
-// What Treblle receives for very large objects
-{
-  "__type": "large_payload",
-  "message": "Object too large to process"
-}
-```
-
-## File Upload Detection
-
-When files are uploaded to your API, the SDK detects them and replaces the binary content with metadata:
-
-```typescript
-// Original request with file upload
-{
-  "profile_image": <binary-data>
-}
-
-// What Treblle receives
-{
-  "profile_image": {
-    "__type": "file",
-    "filename": "profile.jpg",
-    "size": 25000,
-    "mimetype": "image/jpeg"
-  }
-}
-```
-
-## Performance Optimizations
-
-### Serverless Environments
-
-The SDK is optimized for serverless environments like Vercel:
-
-- Minimal cold start impact
-- Lazy initialization
-- Efficient memory usage
-- Request deduplication
-
-### Development vs Production
-
-```typescript
-const treblle = withTreblle({
-  sdkToken: process.env.TREBLLE_SDK_TOKEN!,
-  apiKey: process.env.TREBLLE_API_KEY!,
-  debug: process.env.NODE_ENV !== 'production',
-  // More detailed logging in development
-  maxBodySize: process.env.NODE_ENV === 'production' ? 1024 * 1024 : 5 * 1024 * 1024,
-});
-```
-
-## Integration Examples
-
-### Pages Router Integration
-
-For older Next.js applications using Pages Router:
-
-```typescript
-// pages/api/users.ts
-import { withTreblle } from 'treblle-nextjs/integrations/nextjs';
+```ts
+// pages/api/hello.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { nextTreblle } from '@treblle/next';
 
-const treblle = withTreblle({
+const treblle = nextTreblle({
   sdkToken: process.env.TREBLLE_SDK_TOKEN!,
   apiKey: process.env.TREBLLE_API_KEY!,
 });
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method === 'GET') {
-    return res.json({ users: [] });
-  }
-  
-  if (req.method === 'POST') {
-    const user = await createUser(req.body);
-    return res.status(201).json({ user });
-  }
-  
-  return res.status(405).json({ error: 'Method not allowed' });
+  return res.status(200).json({ ok: true });
 }
 
-export default treblle.pagesHandler(handler);
+export default treblle(handler);
 ```
 
-### TypeScript Support
+App Router:
 
-Full TypeScript support with proper Next.js types:
+```ts
+// app/api/hello/route.ts
+import { NextResponse } from 'next/server';
+import { nextTreblle } from '@treblle/next';
 
-```typescript
-import { createTreblleWrapper } from 'treblle-nextjs/integrations/nextjs';
-
-interface User {
-  id: number;
-  name: string;
-  email: string;
-}
-
-interface UserParams {
-  id: string;
-}
-
-const treblle = createTreblleWrapper({
+const treblle = nextTreblle({
   sdkToken: process.env.TREBLLE_SDK_TOKEN!,
   apiKey: process.env.TREBLLE_API_KEY!,
 });
 
-// Type-safe handler with parameter inference
-export const GET = treblle.handler(
-  async (request: Request, { params }) => {
-    // params.id is correctly typed as string
-    const user: User = await getUserById(params.id);
-    return Response.json({ user });
-  }
-);
+export const GET = treblle(async () => NextResponse.json({ ok: true }));
 ```
 
-## How It Works
+Middleware (optional):
 
-The Treblle SDK for Next.js:
+```ts
+// middleware.ts
+import { NextResponse } from 'next/server';
+import { nextMiddlewareTreblle } from '@treblle/next';
 
-1. Wraps your API route handlers with monitoring logic
-2. Captures request data when it comes in
-3. Intercepts response data before it's sent back
-4. Masks sensitive information according to your configuration
-5. Sends the data to Treblle servers using a fire-and-forget approach
-6. Does all of this with zero impact on your API's performance
-7. Handles Next.js-specific patterns like dynamic routes and route groups
-
-## Debugging
-
-Enable debug mode to see potential errors and monitoring activity:
-
-```typescript
-const treblle = withTreblle({
+const treblle = nextMiddlewareTreblle({
   sdkToken: process.env.TREBLLE_SDK_TOKEN!,
   apiKey: process.env.TREBLLE_API_KEY!,
-  debug: true // Errors and activity will be logged to console
 });
+
+export default treblle(async () => NextResponse.next());
+// export const config = { matcher: ['/api/:path*'] };
 ```
-
-## Best Practices
-
-1. **Environment Variables**: Always use environment variables for sensitive credentials
-2. **Path Filtering**: Use `excludePaths` to avoid monitoring health checks and internal endpoints
-3. **Field Masking**: Add any additional sensitive fields to `additionalMaskedFields`
-4. **Error Handling**: Let the SDK handle error capture automatically, but implement proper error boundaries
-5. **Performance**: Use the enhanced integration for production applications with many features
-6. **Middleware**: Use middleware integration for cross-cutting concerns like authentication and rate limiting
-
-## Next.js Deployment
-
-### Vercel
-
-The SDK works seamlessly with Vercel deployments:
-
-```bash
-# .env.local (for development)
-TREBLLE_SDK_TOKEN=your_token
-TREBLLE_API_KEY=your_key
-
-# Add to Vercel environment variables in dashboard
-```
-
-### Other Platforms
-
-Compatible with all major Next.js hosting platforms:
-
-- Vercel
-- Netlify
-- AWS Amplify
-- Railway
-- Heroku
-- Self-hosted
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Support
-
-If you have any questions or issues, please [open an issue](https://github.com/Treblle/treblle-js/issues) or contact the Treblle team.
