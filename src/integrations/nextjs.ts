@@ -444,12 +444,19 @@ function createWrappedAppRouterHandler<T extends NextRouteHandler>(
     request.headers.forEach((value, key) => {
       requestHeaders[key] = value;
     });
+
+    // Build query object (string values, join duplicates with comma)
+    const urlObj = new URL(request.url);
+    const query: Record<string, string> = {};
+    for (const key of urlObj.searchParams.keys()) {
+      const all = urlObj.searchParams.getAll(key);
+      query[key] = all.join(',');
+    }
     
     const responseHeaders: Record<string, any> = {};
     response.headers.forEach((value, key) => {
       responseHeaders[key] = value;
     });
-    
     // Get route path
     const routePath = options.routeExtractor ? 
       options.routeExtractor(request, context) :
@@ -464,6 +471,7 @@ function createWrappedAppRouterHandler<T extends NextRouteHandler>(
       user_agent: request.headers.get('user-agent') || '',
       method: request.method,
       headers: requestHeaders,
+      query,
       body: requestBody
     };
 
@@ -527,6 +535,16 @@ function createWrappedPagesHandler<T extends NextApiHandler>(
     // Capture request data
     const requestBody = req.body || {};
     const requestHeaders = req.headers || {};
+    // Build query (Next.js Pages: req.query may contain arrays)
+    const query: Record<string, string> = {};
+    if (req.query) {
+      Object.keys(req.query).forEach((k) => {
+        const v = (req.query as any)[k];
+        if (Array.isArray(v)) query[k] = v.join(',');
+        else if (v === undefined || v === null) query[k] = '';
+        else query[k] = String(v);
+      });
+    }
     
     // Execute handler and capture errors
     const errors: TreblleError[] = [];
@@ -576,6 +594,7 @@ function createWrappedPagesHandler<T extends NextApiHandler>(
         user_agent: req.headers['user-agent'] || '',
         method: req.method,
         headers: requestHeaders,
+        query,
         body: requestBody
       };
 
@@ -694,6 +713,16 @@ function createWrappedMiddleware(
       responseHeaders[key] = value;
     });
     
+    // Build query object
+    const query: Record<string, string> = {};
+    request.nextUrl.searchParams.forEach((value, key) => {
+      if (query[key]) {
+        query[key] = `${query[key]},${value}`;
+      } else {
+        query[key] = value;
+      }
+    });
+    
     // Build payload
     const payloadRequest: PayloadRequest = {
       timestamp: requestTimestamp,
@@ -703,6 +732,7 @@ function createWrappedMiddleware(
       user_agent: request.headers.get('user-agent') || '',
       method: request.method,
       headers: requestHeaders,
+      query,
       body: requestBody
     };
 

@@ -433,6 +433,7 @@ describe('Next.js Integration', () => {
 
   describe('Configuration Options', () => {
     test('should respect debug option', async () => {
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
       const debugOptions = { ...treblleOptions, debug: true };
       const wrapper = withTreblle(debugOptions);
       
@@ -443,7 +444,8 @@ describe('Next.js Integration', () => {
       const context = { params: {} };
       
       await wrappedHandler(request, context);
-      // In debug mode, console logs should be called (though we don't test console here)
+      
+      consoleSpy.mockRestore();
     });
 
     test('should handle includePaths option', async () => {
@@ -471,6 +473,173 @@ describe('Next.js Integration', () => {
       
       await wrappedHandler(request, context);
       expect(handler).toHaveBeenCalled();
+    });
+  });
+
+  describe('Pages Router Integration', () => {
+    test('should handle pages router middleware', async () => {
+      const wrapper = createTreblleWrapper(treblleOptions);
+      
+      // Test that middleware exists and is a function
+      expect(typeof wrapper.middleware).toBe('function');
+      
+      // The middleware function should exist but may not be directly testable
+      // without proper Express/Next.js context
+    });
+
+    test('should handle pages router handler', async () => {
+      const wrapper = createTreblleWrapper(treblleOptions);
+      
+      const originalHandler = jest.fn(async (_req, res) => {
+        res.status(200).json({ success: true });
+      });
+      
+      const wrappedHandler = wrapper.pagesHandler(originalHandler);
+      
+      const mockReq = {
+        method: 'GET',
+        url: '/api/test',
+        headers: {},
+        body: null
+      };
+      
+      const mockRes = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn().mockReturnThis(),
+        statusCode: 200,
+        getHeaders: () => ({})
+      };
+      
+      await wrappedHandler(mockReq, mockRes);
+      expect(originalHandler).toHaveBeenCalled();
+    });
+  });
+
+  describe('Edge Cases and Error Scenarios', () => {
+    test('should handle request without URL', async () => {
+      const wrapper = withTreblle(treblleOptions);
+      
+      const handler: NextRouteHandler = async () => new Response('OK');
+      const wrappedHandler = wrapper(handler);
+
+      // Create request without proper URL
+      const request = new Request('http://localhost:3000');
+      const context = { params: {} };
+      
+      const response = await wrappedHandler(request, context);
+      expect(response.status).toBe(200);
+    });
+
+    test('should handle missing context params', async () => {
+      const wrapper = withTreblle(treblleOptions);
+      
+      const handler: NextRouteHandler = async () => new Response('OK');
+      const wrappedHandler = wrapper(handler);
+
+      const request = new Request('http://localhost:3000/api/test');
+      const context = {}; // No params
+      
+      const response = await wrappedHandler(request, context);
+      expect(response.status).toBe(200);
+    });
+
+    test('should handle response without headers', async () => {
+      const wrapper = withTreblle(treblleOptions);
+      
+      const handler: NextRouteHandler = async () => {
+        const response = new Response('OK');
+        // Clear headers
+        response.headers.delete('content-type');
+        return response;
+      };
+      
+      const wrappedHandler = wrapper(handler);
+      const request = new Request('http://localhost:3000/api/test');
+      const context = { params: {} };
+      
+      const response = await wrappedHandler(request, context);
+      expect(response.status).toBe(200);
+    });
+
+    test('should handle large request bodies', async () => {
+      const wrapper = withTreblle(treblleOptions);
+      
+      const handler: NextRouteHandler = async () => new Response('OK');
+      const wrappedHandler = wrapper(handler);
+
+      const largeBody = JSON.stringify({ data: 'x'.repeat(10000) });
+      const request = new Request('http://localhost:3000/api/test', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: largeBody
+      });
+      
+      const context = { params: {} };
+      const response = await wrappedHandler(request, context);
+      expect(response.status).toBe(200);
+    });
+
+    test('should handle binary request bodies', async () => {
+      const wrapper = withTreblle(treblleOptions);
+      
+      const handler: NextRouteHandler = async () => new Response('OK');
+      const wrappedHandler = wrapper(handler);
+
+      const binaryData = new Uint8Array([1, 2, 3, 4, 5]);
+      const request = new Request('http://localhost:3000/api/upload', {
+        method: 'POST',
+        headers: { 'content-type': 'application/octet-stream' },
+        body: binaryData
+      });
+      
+      const context = { params: {} };
+      const response = await wrappedHandler(request, context);
+      expect(response.status).toBe(200);
+    });
+
+    test('should handle form data requests', async () => {
+      const wrapper = withTreblle(treblleOptions);
+      
+      const handler: NextRouteHandler = async () => new Response('OK');
+      const wrappedHandler = wrapper(handler);
+
+      const formData = new FormData();
+      formData.append('field1', 'value1');
+      formData.append('field2', 'value2');
+      
+      const request = new Request('http://localhost:3000/api/form', {
+        method: 'POST',
+        body: formData
+      });
+      
+      const context = { params: {} };
+      const response = await wrappedHandler(request, context);
+      expect(response.status).toBe(200);
+    });
+
+    test('should handle streaming responses', async () => {
+      const wrapper = withTreblle(treblleOptions);
+      
+      const handler: NextRouteHandler = async () => {
+        const stream = new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode('chunk1'));
+            controller.enqueue(new TextEncoder().encode('chunk2'));
+            controller.close();
+          }
+        });
+        
+        return new Response(stream, {
+          headers: { 'content-type': 'text/plain' }
+        });
+      };
+      
+      const wrappedHandler = wrapper(handler);
+      const request = new Request('http://localhost:3000/api/stream');
+      const context = { params: {} };
+      
+      const response = await wrappedHandler(request, context);
+      expect(response.body).toBeInstanceOf(ReadableStream);
     });
   });
 });

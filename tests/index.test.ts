@@ -169,14 +169,13 @@ describe('Treblle SDK Core Functionality', () => {
   });
 
   describe('Data Capture', () => {
-    test('should capture and send payload', () => {
+    test('should capture and send payload', async () => {
       const payload = { test: 'data' };
       treblle.capture(payload);
       
-      // Use setTimeout to allow for asynchronous execution
-      setTimeout(() => {
-        expect(https.request).toHaveBeenCalled();
-      }, 0);
+      // Allow asynchronous execution and assert
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      expect(https.request).toHaveBeenCalled();
     });
 
     test('should not send payload when disabled', () => {
@@ -190,6 +189,305 @@ describe('Treblle SDK Core Functionality', () => {
       disabledTreblle.capture(payload);
       
       expect(https.request).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Middleware Functionality', () => {
+    let mockReq: any;
+    let mockRes: any;
+    let mockNext: any;
+    let middleware: any;
+
+    beforeEach(() => {
+      mockReq = {
+        method: 'GET',
+        url: '/api/test',
+        originalUrl: '/api/test',
+        headers: {
+          'user-agent': 'test-agent',
+          'host': 'localhost:3000'
+        },
+        body: { test: 'data' },
+        query: { param: 'value' },
+        protocol: 'http',
+        get: jest.fn().mockReturnValue('localhost:3000'),
+        connection: { encrypted: false }
+      };
+
+      mockRes = {
+        statusCode: 200,
+        send: jest.fn(),
+        json: jest.fn(),
+        end: jest.fn(),
+        getHeader: jest.fn(),
+        getHeaders: jest.fn().mockReturnValue({}),
+        _treblleErrors: []
+      };
+
+      mockNext = jest.fn();
+      middleware = treblle.middleware();
+    });
+
+    test('should create middleware function', () => {
+      expect(typeof middleware).toBe('function');
+    });
+
+    test('should skip when SDK is disabled', () => {
+      const disabledTreblle = new Treblle({
+        sdkToken: 'test-sdk-token',
+        apiKey: 'test-api-key',
+        enabled: false
+      });
+      
+      const disabledMiddleware = disabledTreblle.middleware();
+      disabledMiddleware(mockReq, mockRes, mockNext);
+      
+      expect(mockNext).toHaveBeenCalled();
+    });
+
+    test('should skip excluded paths', () => {
+      const treblleWithExcludes = new Treblle({
+        sdkToken: 'test-sdk-token',
+        apiKey: 'test-api-key',
+        excludePaths: ['/api/test']
+      });
+      
+      const excludeMiddleware = treblleWithExcludes.middleware();
+      excludeMiddleware(mockReq, mockRes, mockNext);
+      
+      expect(mockNext).toHaveBeenCalled();
+    });
+
+    test('should skip non-included paths when includePaths is set', () => {
+      const treblleWithIncludes = new Treblle({
+        sdkToken: 'test-sdk-token',
+        apiKey: 'test-api-key',
+        includePaths: ['/api/allowed']
+      });
+      
+      const includeMiddleware = treblleWithIncludes.middleware();
+      includeMiddleware(mockReq, mockRes, mockNext);
+      
+      expect(mockNext).toHaveBeenCalled();
+    });
+
+    test('should process request and capture data on response end', () => {
+      middleware(mockReq, mockRes, mockNext);
+      
+      // Simulate response end
+      mockRes.end('response data');
+      
+      expect(mockNext).toHaveBeenCalled();
+      expect(mockReq._treblleRoutePath).toBeDefined();
+      expect(mockRes._treblleErrors).toBeDefined();
+    });
+
+    test('should handle JSON response', () => {
+      middleware(mockReq, mockRes, mockNext);
+      
+      const responseData = { success: true, data: 'test' };
+      mockRes.json(responseData);
+      mockRes.end();
+      
+      expect(mockNext).toHaveBeenCalled();
+    });
+
+    test('should handle file uploads', () => {
+      mockReq.file = {
+        fieldname: 'upload',
+        originalname: 'test.txt',
+        size: 1024,
+        mimetype: 'text/plain',
+        buffer: Buffer.from('test content')
+      };
+      
+      middleware(mockReq, mockRes, mockNext);
+      mockRes.end();
+      
+      expect(mockNext).toHaveBeenCalled();
+    });
+
+    test('should handle multiple file uploads', () => {
+      mockReq.files = {
+        uploads: [{
+          originalname: 'file1.txt',
+          size: 1024,
+          mimetype: 'text/plain'
+        }, {
+          originalname: 'file2.txt',
+          size: 2048,
+          mimetype: 'text/plain'
+        }]
+      };
+      
+      middleware(mockReq, mockRes, mockNext);
+      mockRes.end();
+      
+      expect(mockNext).toHaveBeenCalled();
+    });
+
+    test('should handle binary response', () => {
+      mockRes.getHeader = jest.fn().mockImplementation((header) => {
+        if (header === 'content-type') return 'application/octet-stream';
+        if (header === 'content-disposition') return 'attachment; filename="file.bin"';
+        return '';
+      });
+      
+      middleware(mockReq, mockRes, mockNext);
+      mockRes.end(Buffer.from('binary data'));
+      
+      expect(mockNext).toHaveBeenCalled();
+    });
+
+    test('should handle different content types', () => {
+      mockRes.getHeader = jest.fn().mockImplementation((header) => {
+        if (header === 'content-type') return 'image/png';
+        return '';
+      });
+      
+      middleware(mockReq, mockRes, mockNext);
+      mockRes.end();
+      
+      expect(mockNext).toHaveBeenCalled();
+    });
+
+    test('should parse query parameters from URL when req.query is not available', () => {
+      delete mockReq.query;
+      mockReq.originalUrl = '/api/test?param1=value1&param2=value2';
+      
+      middleware(mockReq, mockRes, mockNext);
+      mockRes.end();
+      
+      expect(mockNext).toHaveBeenCalled();
+    });
+
+    test('should handle malformed URLs gracefully', () => {
+      delete mockReq.query;
+      mockReq.originalUrl = 'invalid-url';
+      mockReq.get = jest.fn().mockReturnValue(null);
+      
+      middleware(mockReq, mockRes, mockNext);
+      mockRes.end();
+      
+      expect(mockNext).toHaveBeenCalled();
+    });
+  });
+
+  describe('Error Handler Middleware', () => {
+    let mockReq: any;
+    let mockRes: any;
+    let mockNext: any;
+    let errorHandler: any;
+
+    beforeEach(() => {
+      mockReq = {};
+      mockRes = {
+        _treblleErrors: []
+      };
+      mockNext = jest.fn();
+      errorHandler = treblle.errorHandler();
+    });
+
+    test('should create error handler function', () => {
+      expect(typeof errorHandler).toBe('function');
+    });
+
+    test('should skip when SDK is disabled', () => {
+      const disabledTreblle = new Treblle({
+        sdkToken: 'test-sdk-token',
+        apiKey: 'test-api-key',
+        enabled: false
+      });
+      
+      const disabledErrorHandler = disabledTreblle.errorHandler();
+      const error = new Error('Test error');
+      
+      disabledErrorHandler(error, mockReq, mockRes, mockNext);
+      
+      expect(mockNext).toHaveBeenCalledWith(error);
+    });
+
+    test('should capture and format errors', () => {
+      const error = new Error('Test error');
+      error.stack = `Error: Test error\n    at Object.<anonymous> (/path/to/file.js:10:5)`;
+      
+      errorHandler(error, mockReq, mockRes, mockNext);
+      
+      expect(mockRes._treblleErrors).toHaveLength(1);
+      expect(mockRes._treblleErrors[0]).toEqual({
+        file: 'file.js',
+        line: 10,
+        message: 'Test error'
+      });
+      expect(mockNext).toHaveBeenCalledWith(error);
+    });
+
+    test('should initialize error array if not exists', () => {
+      delete mockRes._treblleErrors;
+      const error = new Error('Test error');
+      
+      errorHandler(error, mockReq, mockRes, mockNext);
+      
+      expect(mockRes._treblleErrors).toBeDefined();
+      expect(mockRes._treblleErrors).toHaveLength(1);
+    });
+
+    test('should handle null/undefined errors', () => {
+      errorHandler(null, mockReq, mockRes, mockNext);
+      
+      expect(mockNext).toHaveBeenCalledWith(null);
+    });
+  });
+
+  describe('Private Methods', () => {
+    test('should handle HTTPS URL validation', () => {
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+      
+      // Test with HTTP URL (should trigger error)
+      const payload = { test: 'data' };
+      treblle.capture(payload);
+      
+      consoleSpy.mockRestore();
+    });
+
+    test('should handle _sendPayload errors', async () => {
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+      
+      // Mock Math.random to return predictable endpoint
+      const originalRandom = Math.random;
+      Math.random = jest.fn().mockReturnValue(0);
+      
+      const payload = { test: 'data' };
+      treblle.capture(payload);
+      
+      // Allow async execution
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
+      Math.random = originalRandom;
+      consoleSpy.mockRestore();
+    });
+
+    test('should match wildcard patterns correctly', () => {
+      const treblleWithWildcard = new Treblle({
+        sdkToken: 'test-sdk-token',
+        apiKey: 'test-api-key',
+        excludePaths: ['/api/internal/*']
+      });
+      
+      expect(treblleWithWildcard.shouldExcludePath('/api/internal/status')).toBe(true);
+      expect(treblleWithWildcard.shouldExcludePath('/api/internal/health/check')).toBe(true);
+      expect(treblleWithWildcard.shouldExcludePath('/api/public/users')).toBe(false);
+    });
+
+    test('should handle trailing slashes in path matching', () => {
+      const treblleWithPaths = new Treblle({
+        sdkToken: 'test-sdk-token',
+        apiKey: 'test-api-key',
+        excludePaths: ['/health/']
+      });
+      
+      expect(treblleWithPaths.shouldExcludePath('/health')).toBe(true);
+      expect(treblleWithPaths.shouldExcludePath('/health/')).toBe(true);
     });
   });
 

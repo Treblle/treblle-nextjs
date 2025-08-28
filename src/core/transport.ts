@@ -48,7 +48,9 @@ export async function sendToTreblle({ endpoint, sdkToken, payload, debug, timeou
   // Node runtime: use https via dynamic import to avoid top-level require in Edge
   try {
     const url = new URL(endpoint);
-    const https = await import('https');
+    // Use require for sync load and Jest mocks compatibility (Node only)
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const https = require('https');
 
     const options: any = {
       method: 'POST',

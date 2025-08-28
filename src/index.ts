@@ -255,8 +255,33 @@ class Treblle {
         
         // Parse request URL
         const protocol = req.protocol || (req.connection && req.connection.encrypted ? 'https' : 'http');
-        const host = req.get('host') || req.headers.host;
+        const host = req.get ? req.get('host') : (req.headers?.host);
         const url = `${protocol}://${host}${req.originalUrl || req.url}`;
+        
+        // Build query object
+        let query: Record<string, string> = {};
+        try {
+          if (req.query) {
+            const q: Record<string, any> = req.query;
+            const obj: Record<string, string> = {};
+            Object.keys(q).forEach((k) => {
+              const v = q[k];
+              if (Array.isArray(v)) obj[k] = v.join(',');
+              else if (v === undefined || v === null) obj[k] = '';
+              else obj[k] = String(v);
+            });
+            query = obj;
+          } else if (url) {
+            const u = new URL(url);
+            const obj: Record<string, string> = {};
+            u.searchParams.forEach((value, key) => {
+              if (obj[key]) obj[key] = `${obj[key]},${value}`; else obj[key] = value;
+            });
+            query = obj;
+          }
+        } catch (_e) {
+          query = {};
+        }
         
         // Check payload sizes for debugging/reporting
         if (self.debug) {
@@ -316,6 +341,7 @@ class Treblle {
               user_agent: req.headers['user-agent'] || '',
               method: req.method,
               headers: maskSensitiveData(req.headers, self.options.additionalMaskedFields),
+              query: maskSensitiveData(query, self.options.additionalMaskedFields),
               body: processPayloadWithSizeCheck(
                 maskSensitiveData(requestBody, self.options.additionalMaskedFields),
                 {
@@ -435,14 +461,9 @@ class Treblle {
    * @param payload - The payload to send
    */
   public capture(payload: any): void {
-    // Send asynchronously (fire and forget) in a runtime-safe way
-    const schedule = (fn: () => void) => {
-      const g: any = globalThis as any;
-      if (typeof g.setImmediate === 'function') return g.setImmediate(fn);
-      if (typeof queueMicrotask === 'function') return queueMicrotask(fn);
-      return setTimeout(fn, 0);
-    };
-    schedule(() => this._sendPayload(payload));
+    if (!this.enabled) return;
+    // Fire-and-forget; initiate send immediately (non-blocking)
+    this._sendPayload(payload);
   }
 
   /**

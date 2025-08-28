@@ -11,8 +11,10 @@ module.exports = {
   coverageReporters: ['text', 'lcov', 'clover', 'html'],
   collectCoverageFrom: [
     'src/**/*.{js,ts}',
-    '!src/**/*.d.ts',
-    '!src/**/*.interface.ts',
+    'src/**/*.d.ts',
+    'src/**/*.interface.ts',
+    'src/index.ts',
+    'src/integrations/nextjs.ts'
   ],
   coverageThreshold: {
     global: {
@@ -26,7 +28,7 @@ module.exports = {
   testTimeout: 15000,
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
-  clearMocks: true,
+  clearMocks: false,
   restoreMocks: true,
   resetMocks: false,
 

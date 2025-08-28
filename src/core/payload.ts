@@ -17,6 +17,7 @@ export interface PayloadRequest {
   user_agent: string;
   method: string;
   headers: Record<string, any>;
+  query: Record<string, string>;
   body: any;
 }
 
@@ -88,6 +89,7 @@ export function buildTrebllePayload(input: PayloadInput): any {
         user_agent: input.request.user_agent,
         method: input.request.method,
         headers: maskSensitiveData(input.request.headers, input.options.additionalMaskedFields),
+        query: maskSensitiveData(input.request.query, input.options.additionalMaskedFields),
         body: processedRequestBody
       },
       response: {

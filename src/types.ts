@@ -152,6 +152,11 @@ export interface TreblleOptions {
     headers: Record<string, any>;
     
     /**
+     * Query parameters (flattened as strings)
+     */
+    query: Record<string, string>;
+    
+    /**
      * Request body
      */
     body: any;
