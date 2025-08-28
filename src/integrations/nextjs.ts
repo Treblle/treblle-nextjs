@@ -341,8 +341,11 @@ function createWrappedAppRouterHandler<T extends NextRouteHandler>(
   handler: T
 ): T {
   return (async (request: Request, context: { params?: any }) => {
-    // Check if SDK is enabled
-    if (!treblle.options?.enabled && treblle.options?.enabled !== undefined) {
+    // Check if SDK is enabled (environment-aware)
+    const enabled = (typeof (treblle as any).isEnabled === 'function')
+      ? (treblle as any).isEnabled()
+      : options.enabled !== false;
+    if (!enabled) {
       return handler(request, context);
     }
     
@@ -502,8 +505,11 @@ function createWrappedPagesHandler<T extends NextApiHandler>(
   handler: T
 ): T {
   return (async (req: any, res: any) => {
-    // Check if SDK is enabled
-    if (!treblle.options?.enabled && treblle.options?.enabled !== undefined) {
+    // Check if SDK is enabled (environment-aware)
+    const enabled = (typeof (treblle as any).isEnabled === 'function')
+      ? (treblle as any).isEnabled()
+      : options.enabled !== false;
+    if (!enabled) {
       return handler(req, res);
     }
     
@@ -621,8 +627,11 @@ function createWrappedMiddleware(
   config?: MiddlewareConfig
 ): NextMiddlewareHandler {
   return async (request: NextRequest) => {
-    // Check if SDK is enabled
-    if (!treblle.options?.enabled && treblle.options?.enabled !== undefined) {
+    // Check if SDK is enabled (environment-aware)
+    const enabled = (typeof (treblle as any).isEnabled === 'function')
+      ? (treblle as any).isEnabled()
+      : options.enabled !== false;
+    if (!enabled) {
       return middleware(request);
     }
     

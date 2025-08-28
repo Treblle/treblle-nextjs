@@ -4,7 +4,6 @@
  */
 
 import { TreblleOptions } from './types';
-import * as os from 'os';
 
 /**
  * @function getCurrentEnvironment
@@ -12,41 +11,46 @@ import * as os from 'os';
  * @returns Environment name
  */
 export function getCurrentEnvironment(): string {
+  // Guard for Edge runtime where process may be undefined
+  const hasProcess = typeof process !== 'undefined' && typeof process.env !== 'undefined';
+
   // 1. Check NODE_ENV environment variable (most common)
-  const nodeEnv = process.env.NODE_ENV;
-  if (nodeEnv) {
-    return nodeEnv.toLowerCase();
+  if (hasProcess) {
+    const nodeEnv = process.env.NODE_ENV;
+    if (nodeEnv) {
+      return nodeEnv.toLowerCase();
+    }
   }
   
   // 2. Check for other common environment variables
-  if (process.env.APP_ENV) {
+  if (hasProcess && process.env.APP_ENV) {
     return process.env.APP_ENV.toLowerCase();
   }
   
-  if (process.env.ENVIRONMENT) {
+  if (hasProcess && process.env.ENVIRONMENT) {
     return process.env.ENVIRONMENT.toLowerCase();
   }
   
   // 3. Check for cloud provider environment variables
-  if (process.env.VERCEL_ENV) {
+  if (hasProcess && process.env.VERCEL_ENV) {
     return process.env.VERCEL_ENV.toLowerCase();
   }
   
-  if (process.env.HEROKU_ENVIRONMENT) {
+  if (hasProcess && process.env.HEROKU_ENVIRONMENT) {
     return process.env.HEROKU_ENVIRONMENT.toLowerCase();
   }
   
   // 4. Check framework-specific environment variables
-  if (process.env.NEXT_PUBLIC_ENV) {
+  if (hasProcess && process.env.NEXT_PUBLIC_ENV) {
     return process.env.NEXT_PUBLIC_ENV.toLowerCase();
   }
   
   // 5. Check common cloud environment indicators
-  if (process.env.AWS_REGION || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+  if (hasProcess && (process.env.AWS_REGION || process.env.AWS_LAMBDA_FUNCTION_NAME)) {
     return 'production'; // Assume AWS Lambda is production unless otherwise specified
   }
   
-  if (process.env.AZURE_FUNCTIONS_ENVIRONMENT) {
+  if (hasProcess && process.env.AZURE_FUNCTIONS_ENVIRONMENT) {
     return process.env.AZURE_FUNCTIONS_ENVIRONMENT.toLowerCase();
   }
   
@@ -124,19 +128,31 @@ export function getClientIp(req: any): string {
  * @returns Server IP address
  */
 export function getServerIp(): string {
-  const interfaces = os.networkInterfaces();
-  for (const name of Object.keys(interfaces)) {
-    const networkInterface = interfaces[name];
-    if (networkInterface) {
-      for (const iface of networkInterface) {
-        // Skip internal and non-IPv4 addresses
-        if (iface.family === 'IPv4' && !iface.internal) {
-          return iface.address;
+  // Edge/runtime-safe: avoid importing 'os' at module load
+  try {
+    // If process is not available (Edge), return loopback
+    if (typeof process === 'undefined') {
+      return '127.0.0.1';
+    }
+    // Lazily require 'os' only in Node runtimes
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const os = require('os');
+    const interfaces = os.networkInterfaces();
+    for (const name of Object.keys(interfaces)) {
+      const networkInterface = interfaces[name];
+      if (networkInterface) {
+        for (const iface of networkInterface) {
+          // Skip internal and non-IPv4 addresses
+          if (iface.family === 'IPv4' && !iface.internal) {
+            return iface.address;
+          }
         }
       }
     }
+    return '127.0.0.1';
+  } catch (_e) {
+    return '127.0.0.1';
   }
-  return '127.0.0.1';
 }
 
 /**

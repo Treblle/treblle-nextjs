@@ -173,5 +173,17 @@ export interface TreblleOptions {
     'ssn',
     'credit_score',
     'creditScore',
-    'api_key'
+    'api_key',
+    // Common auth and session tokens
+    'authorization',
+    'cookie',
+    'set-cookie',
+    'x-api-key',
+    'x-auth-token',
+    'access_token',
+    'refresh_token',
+    'id_token',
+    'session',
+    'jwt',
+    'token'
   ];

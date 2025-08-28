@@ -23,7 +23,7 @@ Official Treblle SDK for Next.js applications. Monitor API requests in real-time
 ## Installation
 
 ```bash
-npm install treblle-js --save
+npm install treblle-nextjs --save
 ```
 
 ## Quick Start
@@ -32,7 +32,7 @@ npm install treblle-js --save
 
 ```typescript
 // app/api/users/route.ts
-import { withTreblle } from 'treblle-js/integrations/nextjs';
+import { withTreblle } from 'treblle-nextjs/integrations/nextjs';
 
 const treblle = withTreblle({
   sdkToken: process.env.TREBLLE_SDK_TOKEN!,
@@ -60,7 +60,8 @@ Create a `middleware.ts` file in your project root:
 
 ```typescript
 // middleware.ts
-import { createMiddlewareWrapper } from 'treblle-js/integrations/nextjs-middleware';
+import { createMiddlewareWrapper } from 'treblle-nextjs/integrations/nextjs';
+import { NextResponse } from 'next/server';
 
 const withTreblle = createMiddlewareWrapper({
   sdkToken: process.env.TREBLLE_SDK_TOKEN!,
@@ -146,9 +147,9 @@ The SDK works with both Node.js and Edge runtimes:
 // app/api/edge-example/route.ts
 export const runtime = 'edge';
 
-import { withTreblle } from 'treblle-js/integrations/nextjs-enhanced';
+import { createTreblleWrapper } from 'treblle-nextjs/integrations/nextjs';
 
-const treblle = withTreblle({
+const treblle = createTreblleWrapper({
   sdkToken: process.env.TREBLLE_SDK_TOKEN!,
   apiKey: process.env.TREBLLE_API_KEY!,
   enableEdgeRuntime: true, // Optimizes for Edge runtime
@@ -335,7 +336,7 @@ The SDK automatically detects and handles exceptionally large objects (over 2MB 
 ```typescript
 // What Treblle receives for very large objects
 {
-  "__type": "large_object",
+  "__type": "large_payload",
   "message": "Object too large to process"
 }
 ```
@@ -392,7 +393,7 @@ For older Next.js applications using Pages Router:
 
 ```typescript
 // pages/api/users.ts
-import { withTreblle } from 'treblle-js/integrations/nextjs';
+import { withTreblle } from 'treblle-nextjs/integrations/nextjs';
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 const treblle = withTreblle({
@@ -421,7 +422,7 @@ export default treblle.pagesHandler(handler);
 Full TypeScript support with proper Next.js types:
 
 ```typescript
-import { withTreblle, TreblleNextHandler } from 'treblle-js/integrations/nextjs-enhanced';
+import { createTreblleWrapper } from 'treblle-nextjs/integrations/nextjs';
 
 interface User {
   id: number;
@@ -433,13 +434,13 @@ interface UserParams {
   id: string;
 }
 
-const treblle = withTreblle({
+const treblle = createTreblleWrapper({
   sdkToken: process.env.TREBLLE_SDK_TOKEN!,
   apiKey: process.env.TREBLLE_API_KEY!,
 });
 
 // Type-safe handler with parameter inference
-export const GET: TreblleNextHandler<UserParams> = treblle.handler(
+export const GET = treblle.handler(
   async (request: Request, { params }) => {
     // params.id is correctly typed as string
     const user: User = await getUserById(params.id);
@@ -516,4 +517,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Support
 
-If you have any questions or issues, please [open an issue](https://github.com/timpratim/treblle-js/issues) or contact the Treblle team.
+If you have any questions or issues, please [open an issue](https://github.com/Treblle/treblle-js/issues) or contact the Treblle team.

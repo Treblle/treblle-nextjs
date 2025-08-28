@@ -3,7 +3,7 @@
   "version": "2.0.0",
   "description": "Official Treblle SDK for Next.js applications",
   "main": "module-wrapper.js",
-  "module": "dist/esm/index.js",
+  "module": "./dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
@@ -68,9 +68,7 @@
   "peerDependencies": {
     "next": ">=13.0.0"
   },
-  "dependencies": {
-    "dotenv": "^17.2.1"
-  },
+  "dependencies": {},
   "engines": {
     "node": ">=18.0.0"
   },
