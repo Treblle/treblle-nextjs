@@ -20,160 +20,137 @@ import {
   
   describe('Utility Functions', () => {
     describe('getCurrentEnvironment', () => {
-      // Save original environment variables
-      const originalEnv = { ...process.env };
-      
-      afterEach(() => {
-        // Restore original environment after each test
-        process.env = { ...originalEnv };
-      });
-      
-      test('should detect environment from NODE_ENV', () => {
-        process.env.NODE_ENV = 'production';
-        expect(getCurrentEnvironment()).toBe('production');
-        
-        process.env.NODE_ENV = 'development';
-        expect(getCurrentEnvironment()).toBe('development');
-        
-        process.env.NODE_ENV = 'test';
-        expect(getCurrentEnvironment()).toBe('test');
-      });
-      
-      test('should check alternative environment variables', () => {
-        // Clear NODE_ENV
-        delete process.env.NODE_ENV;
-        
-        process.env.APP_ENV = 'staging';
-        expect(getCurrentEnvironment()).toBe('staging');
-        
-        delete process.env.APP_ENV;
-        process.env.ENVIRONMENT = 'qa';
-        expect(getCurrentEnvironment()).toBe('qa');
-        
-        delete process.env.ENVIRONMENT;
-        process.env.VERCEL_ENV = 'preview';
-        expect(getCurrentEnvironment()).toBe('preview');
-      });
-      
-      test('should detect cloud environments', () => {
-        delete process.env.NODE_ENV;
-        delete process.env.APP_ENV;
-        
-        process.env.AWS_REGION = 'us-east-1';
-        expect(getCurrentEnvironment()).toBe('production');
-        
-        delete process.env.AWS_REGION;
-        process.env.AZURE_FUNCTIONS_ENVIRONMENT = 'staging';
-        expect(getCurrentEnvironment()).toBe('staging');
-      });
-      
-      test('should default to development', () => {
-        // Clear all environment variables
-        delete process.env.NODE_ENV;
-        delete process.env.APP_ENV;
-        delete process.env.ENVIRONMENT;
-        delete process.env.VERCEL_ENV;
-        delete process.env.HEROKU_ENVIRONMENT;
-        delete process.env.NEXT_PUBLIC_ENV;
-        delete process.env.AWS_REGION;
-        delete process.env.AWS_LAMBDA_FUNCTION_NAME;
-        delete process.env.AZURE_FUNCTIONS_ENVIRONMENT;
-        
-        expect(getCurrentEnvironment()).toBe('development');
-      });
+    const originalEnv = process.env;
+    
+    afterEach(() => {
+    process.env = originalEnv;
+    });
+    
+    test('should detect environment from NODE_ENV', () => {
+      process.env = { NODE_ENV: 'production' };
+      expect(getCurrentEnvironment()).toBe('production');
+    
+    process.env = { NODE_ENV: 'development' };
+    expect(getCurrentEnvironment()).toBe('development');
+    
+    process.env = { NODE_ENV: 'test' };
+    expect(getCurrentEnvironment()).toBe('test');
+    });
+    
+    test('should check alternative environment variables', () => {
+    process.env = { APP_ENV: 'staging' } as any;
+    expect(getCurrentEnvironment()).toBe('staging');
+    
+    process.env = { ENVIRONMENT: 'qa' } as any;
+    expect(getCurrentEnvironment()).toBe('qa');
+    
+    process.env = { VERCEL_ENV: 'preview' } as any;
+    expect(getCurrentEnvironment()).toBe('preview');
+    });
+    
+    test('should detect cloud environments', () => {
+    process.env = { AWS_REGION: 'us-east-1' } as any;
+    expect(getCurrentEnvironment()).toBe('production');
+    
+    process.env = { AZURE_FUNCTIONS_ENVIRONMENT: 'staging' } as any;
+    expect(getCurrentEnvironment()).toBe('staging');
+    });
+    
+    test('should default to development', () => {
+    process.env = {} as any;
+    expect(getCurrentEnvironment()).toBe('development');
+    });
     });
   
     describe('isEnabledForEnvironment', () => {
-      // Save original environment variables
-      const originalEnv = { ...process.env };
-      
-      afterEach(() => {
-        // Restore original environment after each test
-        process.env = { ...originalEnv };
-      });
-      
-      test('should respect explicit enabled setting', () => {
-        expect(isEnabledForEnvironment({ sdkToken: 'test', apiKey: 'test', enabled: true })).toBe(true);
-        expect(isEnabledForEnvironment({ sdkToken: 'test', apiKey: 'test', enabled: false })).toBe(false);
-      });
-      
-      test('should check disabled environments', () => {
-        process.env.NODE_ENV = 'test';
-        
-        expect(isEnabledForEnvironment({
-          sdkToken: 'test',
-          apiKey: 'test',
-          environments: {
-            disabled: ['test', 'ci']
-          }
-        })).toBe(false);
-        
-        process.env.NODE_ENV = 'production';
-        
-        expect(isEnabledForEnvironment({
-          sdkToken: 'test',
-          apiKey: 'test',
-          environments: {
-            disabled: ['test', 'ci']
-          }
-        })).toBe(true);
-      });
-      
-      test('should check enabled environments', () => {
-        process.env.NODE_ENV = 'production';
-        
-        expect(isEnabledForEnvironment({
-          sdkToken: 'test',
-          apiKey: 'test',
-          environments: {
-            enabled: ['production', 'staging']
-          }
-        })).toBe(true);
-        
-        process.env.NODE_ENV = 'development';
-        
-        expect(isEnabledForEnvironment({
-          sdkToken: 'test',
-          apiKey: 'test',
-          environments: {
-            enabled: ['production', 'staging']
-          }
-        })).toBe(false);
-      });
-      
-      test('should use default setting for unlisted environments', () => {
-        process.env.NODE_ENV = 'custom';
-        
-        expect(isEnabledForEnvironment({
-          sdkToken: 'test',
-          apiKey: 'test',
-          environments: {
-            enabled: ['production'],
-            disabled: ['test'],
-            default: true
-          }
-        })).toBe(true);
-        
-        expect(isEnabledForEnvironment({
-          sdkToken: 'test',
-          apiKey: 'test',
-          environments: {
-            enabled: ['production'],
-            disabled: ['test'],
-            default: false
-          }
-        })).toBe(false);
-      });
-      
-      test('should default to enabled', () => {
-        process.env.NODE_ENV = 'anything';
-        
-        expect(isEnabledForEnvironment({
-          sdkToken: 'test',
-          apiKey: 'test'
-        })).toBe(true);
-      });
+    const originalEnv = process.env;
+    
+    afterEach(() => {
+      process.env = originalEnv;
     });
+    
+    test('should respect explicit enabled setting', () => {
+      expect(isEnabledForEnvironment({ sdkToken: 'test', apiKey: 'test', enabled: true })).toBe(true);
+      expect(isEnabledForEnvironment({ sdkToken: 'test', apiKey: 'test', enabled: false })).toBe(false);
+    });
+    
+    test('should check disabled environments', () => {
+      process.env = { NODE_ENV: 'test' } as any;
+      
+      expect(isEnabledForEnvironment({
+        sdkToken: 'test',
+        apiKey: 'test',
+        environments: {
+          disabled: ['test', 'ci']
+        }
+      })).toBe(false);
+      
+      process.env = { NODE_ENV: 'production' } as any;
+      
+      expect(isEnabledForEnvironment({
+        sdkToken: 'test',
+        apiKey: 'test',
+        environments: {
+          disabled: ['test', 'ci']
+        }
+      })).toBe(true);
+    });
+    
+    test('should check enabled environments', () => {
+      process.env = { NODE_ENV: 'production' } as any;
+      
+      expect(isEnabledForEnvironment({
+        sdkToken: 'test',
+        apiKey: 'test',
+        environments: {
+          enabled: ['production', 'staging']
+        }
+      })).toBe(true);
+      
+      process.env = { NODE_ENV: 'development' } as any;
+      
+      expect(isEnabledForEnvironment({
+        sdkToken: 'test',
+        apiKey: 'test',
+        environments: {
+          enabled: ['production', 'staging']
+        }
+      })).toBe(false);
+    });
+    
+    test('should use default setting for unlisted environments', () => {
+      process.env = { NODE_ENV: 'custom' } as any;
+      
+      expect(isEnabledForEnvironment({
+        sdkToken: 'test',
+        apiKey: 'test',
+        environments: {
+          enabled: ['production'],
+          disabled: ['test'],
+          default: true
+        }
+      })).toBe(true);
+      
+      expect(isEnabledForEnvironment({
+        sdkToken: 'test',
+        apiKey: 'test',
+        environments: {
+          enabled: ['production'],
+          disabled: ['test'],
+          default: false
+        }
+      })).toBe(false);
+    });
+    
+    test('should default to enabled', () => {
+      process.env = { NODE_ENV: 'anything' } as any;
+      
+      expect(isEnabledForEnvironment({
+        sdkToken: 'test',
+        apiKey: 'test'
+      })).toBe(true);
+    });
+  });
   
     describe('getClientIp', () => {
       test('should get IP from x-forwarded-for header', () => {
@@ -327,23 +304,27 @@ import {
     });
   
     describe('extractRoutePath', () => {
-      test('should extract path from Express route', () => {
-        const req = {
-          route: {
-            path: '/users/:id'
-          }
-        };
-        
-        expect(extractRoutePath(req)).toBe('/users/:id');
-      });
-      
-      test('should return empty string if no route info available', () => {
-        const req = {
-          url: '/users/123',
-          originalUrl: '/users/123'
-        };
-        
-        expect(extractRoutePath(req)).toBe('');
-      });
+    test('should extract path from URL', () => {
+    const req = {
+    url: '/users/123',
+    originalUrl: '/users/123'
+    };
+    
+    expect(extractRoutePath(req)).toBe('/users/123');
     });
+    
+    test('should return empty string if no URL available', () => {
+      const req = {};
+    
+    expect(extractRoutePath(req)).toBe('');
+    });
+
+    test('should strip query parameters from URL', () => {
+    const req = {
+        originalUrl: '/users/123?sort=name&limit=10'
+        };
+      
+      expect(extractRoutePath(req)).toBe('/users/123');
+    });
+  });
   });

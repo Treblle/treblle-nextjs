@@ -4,7 +4,6 @@
  */
 
 import { TreblleOptions } from './types';
-import os from 'os';
 
 /**
  * @function getCurrentEnvironment
@@ -12,41 +11,46 @@ import os from 'os';
  * @returns Environment name
  */
 export function getCurrentEnvironment(): string {
+  // Guard for Edge runtime where process may be undefined
+  const hasProcess = typeof process !== 'undefined' && typeof process.env !== 'undefined';
+
   // 1. Check NODE_ENV environment variable (most common)
-  const nodeEnv = process.env.NODE_ENV;
-  if (nodeEnv) {
-    return nodeEnv.toLowerCase();
+  if (hasProcess) {
+    const nodeEnv = process.env.NODE_ENV;
+    if (nodeEnv) {
+      return nodeEnv.toLowerCase();
+    }
   }
   
   // 2. Check for other common environment variables
-  if (process.env.APP_ENV) {
+  if (hasProcess && process.env.APP_ENV) {
     return process.env.APP_ENV.toLowerCase();
   }
   
-  if (process.env.ENVIRONMENT) {
+  if (hasProcess && process.env.ENVIRONMENT) {
     return process.env.ENVIRONMENT.toLowerCase();
   }
   
   // 3. Check for cloud provider environment variables
-  if (process.env.VERCEL_ENV) {
+  if (hasProcess && process.env.VERCEL_ENV) {
     return process.env.VERCEL_ENV.toLowerCase();
   }
   
-  if (process.env.HEROKU_ENVIRONMENT) {
+  if (hasProcess && process.env.HEROKU_ENVIRONMENT) {
     return process.env.HEROKU_ENVIRONMENT.toLowerCase();
   }
   
   // 4. Check framework-specific environment variables
-  if (process.env.NEXT_PUBLIC_ENV) {
+  if (hasProcess && process.env.NEXT_PUBLIC_ENV) {
     return process.env.NEXT_PUBLIC_ENV.toLowerCase();
   }
   
   // 5. Check common cloud environment indicators
-  if (process.env.AWS_REGION || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+  if (hasProcess && (process.env.AWS_REGION || process.env.AWS_LAMBDA_FUNCTION_NAME)) {
     return 'production'; // Assume AWS Lambda is production unless otherwise specified
   }
   
-  if (process.env.AZURE_FUNCTIONS_ENVIRONMENT) {
+  if (hasProcess && process.env.AZURE_FUNCTIONS_ENVIRONMENT) {
     return process.env.AZURE_FUNCTIONS_ENVIRONMENT.toLowerCase();
   }
   
@@ -82,7 +86,12 @@ export function isEnabledForEnvironment(config: TreblleOptions): boolean {
       // Check if current environment is in the enabled list
       if (Array.isArray(config.environments.enabled) && 
           config.environments.enabled.length > 0) {
-        return config.environments.enabled.includes(currentEnv);
+        // If environment is in enabled list, return true
+        if (config.environments.enabled.includes(currentEnv)) {
+          return true;
+        }
+        // If environment is not in enabled list, use default (false if not specified)
+        return config.environments.default === true;
       }
       
       // If environment is not explicitly listed in either, use the default
@@ -102,7 +111,7 @@ export function isEnabledForEnvironment(config: TreblleOptions): boolean {
 /**
  * @function getClientIp
  * @description Gets the client IP address
- * @param req - Express request object
+ * @param req - Request object
  * @returns Client IP address
  */
 export function getClientIp(req: any): string {
@@ -119,26 +128,38 @@ export function getClientIp(req: any): string {
  * @returns Server IP address
  */
 export function getServerIp(): string {
-  const interfaces = os.networkInterfaces();
-  for (const name of Object.keys(interfaces)) {
-    const networkInterface = interfaces[name];
-    if (networkInterface) {
-      for (const iface of networkInterface) {
-        // Skip internal and non-IPv4 addresses
-        if (iface.family === 'IPv4' && !iface.internal) {
-          return iface.address;
+  // Edge/runtime-safe: avoid importing 'os' at module load
+  try {
+    // If process is not available (Edge), return loopback
+    if (typeof process === 'undefined') {
+      return '127.0.0.1';
+    }
+    // Lazily require 'os' only in Node runtimes
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const os = require('os');
+    const interfaces = os.networkInterfaces();
+    for (const name of Object.keys(interfaces)) {
+      const networkInterface = interfaces[name];
+      if (networkInterface) {
+        for (const iface of networkInterface) {
+          // Skip internal and non-IPv4 addresses
+          if (iface.family === 'IPv4' && !iface.internal) {
+            return iface.address;
+          }
         }
       }
     }
+    return '127.0.0.1';
+  } catch (_e) {
+    return '127.0.0.1';
   }
-  return '127.0.0.1';
 }
 
 /**
  * @function calculateResponseSize
  * @description Calculate the size of the response in bytes
  * @param body - Response body
- * @param res - Express response object
+ * @param res - Response object
  * @returns Size in bytes
  */
 export function calculateResponseSize(body: any, res: any): number {
@@ -179,102 +200,80 @@ export function calculateResponseSize(body: any, res: any): number {
 
 /**
  * @function extractRoutePath
- * @description Extract the route path pattern from the request
- * @param req - Express request object
+ * @description Extract the route path pattern from the request - NextJS only
+ * @param req - Request object
  * @returns Route path pattern or original URL path if route not available
  */
 export function extractRoutePath(req: any): string {
-  // Try various ways to get the route pattern
-  
-  // 1. Direct access to Express route (most common approach)
-  if (req.route && req.route.path) {
-    // Get the base path from the route
-    let basePath = req.route.path;
-    
-    // Check if there's a baseUrl to prepend (for routers with a base path)
-    if (req.baseUrl) {
-      return `${req.baseUrl}${basePath}`;
-    }
-    
-    return basePath;
-  }
-  
-  // 2. Check for route path in Express 4.x
-  if (req._parsedUrl && req.url) {
-    try {
-      // Try to extract the route by removing query parameters
-      const pathWithoutQuery = req.url.split('?')[0];
-      
-      // If we have router base path, include it
-      if (req.baseUrl) {
-        return `${req.baseUrl}${pathWithoutQuery}`;
-      }
-      
-      return pathWithoutQuery;
-    } catch (e) {
-      // If parsing fails, continue to next approach
-    }
-  }
-  
-  // 3. Access router stack (more complex but can work in some Express setups)
-  if (req.app && req.app._router && req.app._router.stack) {
-    try {
-      const url = req.originalUrl || req.url;
-      const method = req.method.toLowerCase();
-      
-      // Find matching route in the router stack
-      for (const layer of req.app._router.stack) {
-        if (layer.route) {
-          const routePath = layer.route.path;
-          const routeMethods = Object.keys(layer.route.methods);
-          
-          // Check if this route matches our URL pattern and method
-          if (routeMethods.includes(method)) {
-            // Simple matching for exact routes
-            if (routePath === url) {
-              return routePath;
-            }
-            
-            // Check for parametrized routes (/:id pattern)
-            if (routePath.includes(':') && layer.regexp) {
-              const match = layer.regexp.test(url);
-              if (match) {
-                return routePath;
-              }
-            }
-          }
-        }
-      }
-    } catch (e) {
-      // If router stack parsing fails, continue to next approach
-    }
-  }
-  
-  // 4. For NestJS applications
-  if (req.params && Object.keys(req.params).length > 0) {
-    // Try to reconstruct the route path from current URL and params
-    let path = req.originalUrl || req.url;
-    
-    // Remove query string if present
-    path = path.split('?')[0];
-    
-    // Replace actual parameter values with parameter placeholders
-    for (const [paramName, paramValue] of Object.entries(req.params)) {
-      if (typeof paramValue === 'string') {
-        path = path.replace(paramValue, `:${paramName}`);
-      }
-    }
-    
-    return path;
-  }
-  
-  // 5. Last resort: Return the URL path without query parameters
-  // This at least gives us something useful rather than an empty string
+  // For NextJS applications - simplified version
   if (req.originalUrl || req.url) {
     const urlPath = (req.originalUrl || req.url).split('?')[0];
     return urlPath;
   }
   
-  // If all else fails, return the original URL or an empty string
-  return req.originalUrl || req.url || '';
+  // If all else fails, return empty string
+  return '';
+}
+
+/**
+ * @function hrToMicro
+ * @description Helper to convert hrtime to microseconds
+ * @param hrtime - High resolution time tuple
+ * @returns Duration in microseconds
+ */
+export function hrToMicro(hrtime: [number, number]): number {
+  return hrtime[0] * 1000000 + hrtime[1] / 1000;
+}
+
+/**
+ * @function getNextClientIp
+ * @description Helper to extract client IP from Next.js Request
+ * @param req - Next.js Request object
+ * @returns Client IP address
+ */
+export function getNextClientIp(req: Request): string {
+  // Try headers in order of preference
+  const headers = req.headers;
+  
+  const forwardedFor = headers.get('x-forwarded-for');
+  if (forwardedFor) {
+    // Get the first IP from the comma-separated list
+    return forwardedFor.split(',')[0].trim();
+  }
+  
+  const realIp = headers.get('x-real-ip');
+  if (realIp) {
+    return realIp;
+  }
+  
+  const clientIp = headers.get('x-client-ip');
+  if (clientIp) {
+    return clientIp;
+  }
+  
+  // Fallback to localhost
+  return '127.0.0.1';
+}
+
+/**
+ * @function getNextRoutePath
+ * @description Helper to extract route path from Next.js request
+ * @param req - Next.js Request object
+ * @param context - Route context with params
+ * @returns Route path pattern
+ */
+export function getNextRoutePath(req: Request, context?: { params?: any }): string {
+  const url = new URL(req.url);
+  let pathname = url.pathname;
+  
+  // If we have params, try to replace them with placeholders
+  if (context?.params) {
+    Object.entries(context.params).forEach(([key, value]) => {
+      if (typeof value === 'string') {
+        pathname = pathname.replace(new RegExp(`/${value}(?=/|$)`), `/{${key}}`);
+      }
+    });
+  }
+  
+  return pathname;
 }

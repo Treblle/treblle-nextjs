@@ -51,6 +51,21 @@ export interface TreblleOptions {
      * Environment configuration
      */
     environments?: boolean | TreblleEnvironments;
+    
+    /**
+     * Maximum payload size in bytes (default: 5MB)
+     */
+    maxPayloadSize?: number;
+    
+    /**
+     * Warning threshold for large payloads in bytes (default: 2MB)
+     */
+    payloadWarningSize?: number;
+    
+    /**
+     * Enable memory-efficient size estimation (default: true)
+     */
+    enableSizeEstimation?: boolean;
   }
   
   /**
@@ -137,6 +152,11 @@ export interface TreblleOptions {
     headers: Record<string, any>;
     
     /**
+     * Query parameters (flattened as strings)
+     */
+    query: Record<string, string>;
+    
+    /**
      * Request body
      */
     body: any;
@@ -158,5 +178,17 @@ export interface TreblleOptions {
     'ssn',
     'credit_score',
     'creditScore',
-    'api_key'
+    'api_key',
+    // Common auth and session tokens
+    'authorization',
+    'cookie',
+    'set-cookie',
+    'x-api-key',
+    'x-auth-token',
+    'access_token',
+    'refresh_token',
+    'id_token',
+    'session',
+    'jwt',
+    'token'
   ];
