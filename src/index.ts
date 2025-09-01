@@ -36,6 +36,7 @@ class Treblle {
   // @ts-ignore: Used in payload construction
   private apiKey: string = '';
   private debug: boolean = false;
+  private debugVerbose: boolean = false;
   private excludePaths: (string | RegExp)[] = [];
   private includePaths: (string | RegExp)[] = [];
   private enabled: boolean = true;
@@ -63,6 +64,7 @@ class Treblle {
     this.sdkToken = options.sdkToken;
     this.apiKey = options.apiKey;
     this.debug = options.debug || false;
+    this.debugVerbose = options.debugVerbose || false;
     
     // Initialize path filters
     this.excludePaths = options.excludePaths || [];
@@ -492,6 +494,7 @@ class Treblle {
         sdkToken: this.sdkToken,
         payload,
         debug: this.debug,
+        debugVerbose: this.debugVerbose,
         timeoutMs: 5000,
       });
     } catch (error: unknown) {
