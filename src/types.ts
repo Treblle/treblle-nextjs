@@ -26,6 +26,12 @@ export interface TreblleOptions {
      * Enable debug mode to log errors to console
      */
     debug?: boolean;
+
+    /**
+     * Verbose debug mode: logs endpoint selection, sanitized payload preview,
+     * and Treblle response status/body (truncated). Intended for local testing.
+     */
+    debugVerbose?: boolean;
     
     /**
      * Paths to exclude from monitoring

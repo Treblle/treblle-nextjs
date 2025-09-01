@@ -8,6 +8,7 @@ export interface SendOptions {
   sdkToken: string;
   payload: any;
   debug?: boolean;
+  debugVerbose?: boolean;
   timeoutMs?: number;
 }
 
@@ -19,12 +20,33 @@ function isEdgeRuntime(): boolean {
   );
 }
 
-export async function sendToTreblle({ endpoint, sdkToken, payload, debug, timeoutMs = 5000 }: SendOptions): Promise<void> {
+function truncate(str: string, max = 8000): string {
+  if (str.length <= max) return str;
+  return str.slice(0, max) + `\n...[truncated ${str.length - max} chars]`;
+}
+
+export async function sendToTreblle({ endpoint, sdkToken, payload, debug, debugVerbose, timeoutMs = 5000 }: SendOptions): Promise<void> {
   // Prefer fetch in Edge runtimes
   if (isEdgeRuntime()) {
     const controller = new AbortController();
     const t = setTimeout(() => controller.abort(), timeoutMs);
     try {
+      if (debugVerbose) {
+        // eslint-disable-next-line no-console
+        console.log('==== DEBUG: TREBLLE ENDPOINT ====' );
+        // eslint-disable-next-line no-console
+        console.log(`Sending to: ${endpoint}`);
+        // eslint-disable-next-line no-console
+        console.log('================================');
+
+        // eslint-disable-next-line no-console
+        console.log('\n==== DEBUG: TREBLLE PAYLOAD ====');
+        const preview = truncate(JSON.stringify(payload, null, 2));
+        // eslint-disable-next-line no-console
+        console.log(preview);
+        // eslint-disable-next-line no-console
+        console.log('================================\n');
+      }
       await fetch(endpoint, {
         method: 'POST',
         headers: {
@@ -33,6 +55,21 @@ export async function sendToTreblle({ endpoint, sdkToken, payload, debug, timeou
         },
         body: JSON.stringify(payload),
         signal: controller.signal,
+      }).then(async (res) => {
+        if (debugVerbose) {
+          let body = '';
+          try { body = await res.text(); } catch { body = ''; }
+          // eslint-disable-next-line no-console
+          console.log('\n==== DEBUG: TREBLLE RESPONSE ====');
+          // eslint-disable-next-line no-console
+          console.log(`Status: ${res.status} ${res.statusText}`);
+          if (body) {
+            // eslint-disable-next-line no-console
+            console.log(`Response: ${truncate(body)}`);
+          }
+          // eslint-disable-next-line no-console
+          console.log('================================');
+        }
       });
     } catch (err: unknown) {
       if (debug) {
@@ -64,10 +101,24 @@ export async function sendToTreblle({ endpoint, sdkToken, payload, debug, timeou
 
     await new Promise<void>((resolve) => {
       const req = https.request(options, (res: any) => {
-        // Avoid logging in transport to prevent post-test console warnings
-        // Drain and ignore
-        res.on('data', () => {});
-        res.on('end', () => resolve());
+        let chunks: Buffer[] = [];
+        res.on('data', (c: Buffer) => { if (debugVerbose) chunks.push(c); });
+        res.on('end', () => {
+          if (debugVerbose) {
+            const body = Buffer.concat(chunks).toString('utf8');
+            // eslint-disable-next-line no-console
+            console.log('\n==== DEBUG: TREBLLE RESPONSE ====');
+            // eslint-disable-next-line no-console
+            console.log(`Status: ${res.statusCode}`);
+            if (body) {
+              // eslint-disable-next-line no-console
+              console.log(`Response: ${truncate(body)}`);
+            }
+            // eslint-disable-next-line no-console
+            console.log('================================');
+          }
+          resolve();
+        });
       });
 
       req.on('error', (_e: any) => resolve());

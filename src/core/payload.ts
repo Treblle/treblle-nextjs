@@ -47,10 +47,14 @@ export interface PayloadInput {
  */
 export function buildTrebllePayload(input: PayloadInput): any {
   const sizeOptions = input.sizeOptions || {};
+  const isEmptyObject = (v: any) => v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === 0;
   
   // Process request and response bodies with size checking
+  const rawRequestBody = (input.request.method === 'GET' && isEmptyObject(input.request.body))
+    ? input.request.query
+    : input.request.body;
   const processedRequestBody = processPayloadWithSizeCheck(
-    maskSensitiveData(input.request.body, input.options.additionalMaskedFields),
+    maskSensitiveData(rawRequestBody, input.options.additionalMaskedFields),
     sizeOptions
   );
   
@@ -61,7 +65,7 @@ export function buildTrebllePayload(input: PayloadInput): any {
   
   const hasProcess = typeof process !== 'undefined';
 
-  return {
+  const payload: any = {
     api_key: input.sdkToken,
     project_id: input.apiKey,
     sdk: 'nextjs',
@@ -90,7 +94,7 @@ export function buildTrebllePayload(input: PayloadInput): any {
         method: input.request.method,
         headers: maskSensitiveData(input.request.headers, input.options.additionalMaskedFields),
         query: maskSensitiveData(input.request.query, input.options.additionalMaskedFields),
-        body: processedRequestBody
+        body: isEmptyObject(processedRequestBody) ? null : processedRequestBody
       },
       response: {
         headers: maskSensitiveData(input.response.headers, input.options.additionalMaskedFields),
@@ -99,9 +103,28 @@ export function buildTrebllePayload(input: PayloadInput): any {
           calculateResponseSize(input.response.body, input.responseObject) : 
           input.response.size,
         load_time: input.response.load_time,
-        body: processedResponseBody
+        body: isEmptyObject(processedResponseBody) ? null : processedResponseBody
       },
       errors: input.errors
     }
   };
+
+  // Promote user and tracing info from headers when present
+  try {
+    const hdrs = input.request.headers || {};
+    const userId = hdrs['treblle-user-id'] || hdrs['x-treblle-user-id'] || hdrs['x-user-id'];
+    const traceparent = hdrs['traceparent'];
+    const baggage = hdrs['baggage'];
+    if (userId) {
+      (payload.data as any).user = { id: String(userId) };
+    }
+    if (traceparent || baggage) {
+      (payload.data as any).trace = {
+        ...(traceparent ? { traceparent } : {}),
+        ...(baggage ? { baggage } : {}),
+      };
+    }
+  } catch { /* no-op */ }
+
+  return payload;
 }

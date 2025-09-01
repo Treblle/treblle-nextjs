@@ -461,6 +461,14 @@ function createWrappedAppRouterHandler<T extends NextRouteHandler>(
     const routePath = options.routeExtractor ? 
       options.routeExtractor(request, context) :
       extractNextRoute(request, context);
+
+    if (options.debugVerbose) {
+      console.log('==== DEBUG: TREBLLE ROUTE PATH ====');
+      console.log(`Original URL Path: ${pathname}`);
+      console.log(`Normalized Route Path: ${routePath}`);
+      console.log(`Full URL: ${request.url}`);
+      console.log('================================');
+    }
     
     // Build payload
     const payloadRequest: PayloadRequest = {
@@ -666,6 +674,10 @@ function createWrappedMiddleware(
       return middleware(request);
     }
     
+    if (options.debugVerbose) {
+      try { console.log(`Middleware processing: ${request.method} ${request.url}`); } catch {}
+    }
+
     // Start timing
     const requestStartTime = startTiming();
     const requestTimestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
@@ -738,10 +750,11 @@ function createWrappedMiddleware(
 
     const payloadResponse: PayloadResponse = {
       headers: responseHeaders,
+      // In middleware we often don't have the final handler status; NextResponse.next() defaults to 200
       code: response.status,
       size: 0,
       load_time: duration,
-      body: {} // Middleware typically doesn't have response bodies
+      body: {} // Middleware cannot access downstream response body
     };
 
     const payload = buildTrebllePayload({

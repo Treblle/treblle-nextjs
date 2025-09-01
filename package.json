@@ -1,6 +1,6 @@
 {
-  "name": "treblle-nextjs",
-  "version": "2.0.0",
+  "name": "@treblle/next",
+  "version": "1.0.0",
   "description": "Official Treblle SDK for Next.js applications",
   "main": "module-wrapper.js",
   "module": "./dist/index.js",
@@ -72,10 +72,14 @@
   "engines": {
     "node": ">=18.0.0"
   },
+  "sideEffects": false,
   "files": [
     "dist",
     "module-wrapper.js",
     "README.md",
     "LICENSE"
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }
