@@ -56,9 +56,9 @@ Pick your routing setup:
 
 ```ts
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { nextTreblle } from '@treblle/next';
+import { withTrebllePages } from '@treblle/next/integrations/nextjs';
 
-const treblle = nextTreblle({
+const treblle = withTrebllePages({
   sdkToken: process.env.TREBLLE_SDK_TOKEN!,
   apiKey: process.env.TREBLLE_API_KEY!,
   // debug: process.env.NODE_ENV !== 'production',
@@ -75,9 +75,9 @@ export default treblle(handler);
 JavaScript version:
 
 ```js
-import { nextTreblle } from '@treblle/next';
+import { withTrebllePages } from '@treblle/next/integrations/nextjs';
 
-const treblle = nextTreblle({
+const treblle = withTrebllePages({
   sdkToken: process.env.TREBLLE_SDK_TOKEN,
   apiKey: process.env.TREBLLE_API_KEY,
 });
@@ -96,9 +96,9 @@ export default treblle(handler);
 
 ```ts
 import { NextResponse } from 'next/server';
-import { nextTreblle } from '@treblle/next';
+import { withTreblle } from '@treblle/next/integrations/nextjs';
 
-const treblle = nextTreblle({
+const treblle = withTreblle({
   sdkToken: process.env.TREBLLE_SDK_TOKEN!,
   apiKey: process.env.TREBLLE_API_KEY!,
   // debug: process.env.NODE_ENV !== 'production',
@@ -124,9 +124,9 @@ Use only if you want coarse-grained visibility on every request. Middleware canâ
 ```ts
 // middleware.ts
 import { NextResponse } from 'next/server';
-import { nextMiddlewareTreblle } from '@treblle/next';
+import { withTreblleMiddleware } from '@treblle/next/integrations/nextjs';
 
-const treblle = nextMiddlewareTreblle({
+const treblle = withTreblleMiddleware({
   sdkToken: process.env.TREBLLE_SDK_TOKEN!,
   apiKey: process.env.TREBLLE_API_KEY!,
   // blocklistPaths: [/^\/_next\//, 'static', 'images'],
@@ -140,7 +140,7 @@ export default treblle(async () => NextResponse.next());
 
 ## Configuration
 
-Pass these options to `nextTreblle` or `nextMiddlewareTreblle`:
+Pass these options to `withTreblle`, `withTrebllePages`, or `withTreblleMiddleware`:
 
 - `sdkToken`: Your Treblle SDK token (required)
 - `apiKey`: Your Treblle API key (required)
@@ -152,7 +152,7 @@ Pass these options to `nextTreblle` or `nextMiddlewareTreblle`:
 Example:
 
 ```ts
-const treblle = nextTreblle({
+const treblle = withTreblle({
   sdkToken: process.env.TREBLLE_SDK_TOKEN!,
   apiKey: process.env.TREBLLE_API_KEY!,
   additionalFieldsToMask: ['customSecret', 'internalId'],
@@ -166,7 +166,7 @@ Production-only enablement:
 
 ```ts
 const maybeTreblle = process.env.NODE_ENV === 'production'
-  ? nextTreblle({ sdkToken: process.env.TREBLLE_SDK_TOKEN!, apiKey: process.env.TREBLLE_API_KEY! })
+  ? withTreblle({ sdkToken: process.env.TREBLLE_SDK_TOKEN!, apiKey: process.env.TREBLLE_API_KEY! })
   : ((h: any) => h); // no-op passthrough
 
 export const GET = maybeTreblle(async () => NextResponse.json({ ok: true }));
@@ -208,12 +208,12 @@ blocklistPaths: ['favicon.ico'],
 
 ## API Reference
 
-- `nextTreblle(config) -> (handler) => wrappedHandler`
-  - Wraps Next.js API handlers (Pages) and route method handlers (App Router)
-  - Works in Node and Edge (per handler runtime)
-
-- `nextMiddlewareTreblle(config) -> (mw) => wrappedMiddleware`
-  - Wraps `middleware.ts` for coarse-grained, global observation (Edge)
+- `withTreblle(config) -> (handler) => wrappedHandler`
+  - Wraps App Router route method handlers
+- `withTrebllePages(config) -> (handler) => wrappedHandler`
+  - Wraps Pages Router API handlers
+- `withTreblleMiddleware(config) -> (mw) => wrappedMiddleware`
+  - Wraps `middleware.ts` for global observation (Edge)
 
 Config type (informal):
 
@@ -255,9 +255,9 @@ Pages Router:
 ```ts
 // pages/api/hello.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { nextTreblle } from '@treblle/next';
+import { withTrebllePages } from '@treblle/next/integrations/nextjs';
 
-const treblle = nextTreblle({
+const treblle = withTrebllePages({
   sdkToken: process.env.TREBLLE_SDK_TOKEN!,
   apiKey: process.env.TREBLLE_API_KEY!,
 });
@@ -274,9 +274,9 @@ App Router:
 ```ts
 // app/api/hello/route.ts
 import { NextResponse } from 'next/server';
-import { nextTreblle } from '@treblle/next';
+import { withTreblle } from '@treblle/next/integrations/nextjs';
 
-const treblle = nextTreblle({
+const treblle = withTreblle({
   sdkToken: process.env.TREBLLE_SDK_TOKEN!,
   apiKey: process.env.TREBLLE_API_KEY!,
 });
@@ -289,9 +289,9 @@ Middleware (optional):
 ```ts
 // middleware.ts
 import { NextResponse } from 'next/server';
-import { nextMiddlewareTreblle } from '@treblle/next';
+import { withTreblleMiddleware } from '@treblle/next/integrations/nextjs';
 
-const treblle = nextMiddlewareTreblle({
+const treblle = withTreblleMiddleware({
   sdkToken: process.env.TREBLLE_SDK_TOKEN!,
   apiKey: process.env.TREBLLE_API_KEY!,
 });
