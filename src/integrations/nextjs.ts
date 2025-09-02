@@ -28,7 +28,7 @@ import type { NextRequest, NextResponse } from 'next/server';
  * App Router Route Handler type
  */
 export type NextRouteHandler<T = any> = 
-  (request: Request, context: { params?: T }) => Response | Promise<Response>;
+  (request: Request, context: { params?: T | Promise<T> }) => Response | Promise<Response>;
 
 /**
  * Pages Router API Handler type  
@@ -46,7 +46,7 @@ export type NextMiddlewareHandler =
  * Route context with enhanced params support
  */
 export interface NextRouteContext {
-  params?: Record<string, string | string[]>;
+  params?: Record<string, string | string[]> | Promise<Record<string, string | string[]>>;
   searchParams?: Record<string, string>;
 }
 
@@ -67,7 +67,7 @@ export interface NextjsTreblleOptions extends TreblleOptions {
   /**
    * Custom route path extraction function
    */
-  routeExtractor?: (request: Request, context?: NextRouteContext) => string;
+  routeExtractor?: (request: Request, context?: NextRouteContext) => string | Promise<string>;
   
   /**
    * Maximum body size to process (default: 2MB)
@@ -192,7 +192,7 @@ function isDefaultBlockedPath(pathname: string): boolean {
 /**
  * Enhanced route path extraction for Next.js
  */
-function extractNextRoute(request: Request, context?: NextRouteContext): string {
+async function extractNextRoute(request: Request, context?: NextRouteContext): Promise<string> {
   const url = new URL(request.url);
   let pathname = url.pathname;
   
@@ -201,16 +201,25 @@ function extractNextRoute(request: Request, context?: NextRouteContext): string 
     pathname = pathname.substring(4);
   }
   
-  // Handle dynamic routes using context.params
+  // Handle dynamic routes using context.params (Next 15: may be a Promise)
   if (context?.params) {
-    for (const [key, value] of Object.entries(context.params)) {
-      if (Array.isArray(value)) {
-        // Catch-all routes [...slug]
-        const slugPath = value.join('/');
-        pathname = pathname.replace(slugPath, `[...${key}]`);
-      } else {
-        // Regular dynamic routes [id]
-        pathname = pathname.replace(String(value), `[${key}]`);
+    let params: Record<string, string | string[]> | undefined;
+    try {
+      const maybeParams = context.params as any;
+      params = typeof maybeParams?.then === 'function' ? await maybeParams : maybeParams;
+    } catch {
+      params = undefined;
+    }
+    if (params) {
+      for (const [key, value] of Object.entries(params)) {
+        if (Array.isArray(value)) {
+          // Catch-all routes [...slug]
+          const slugPath = value.join('/');
+          pathname = pathname.replace(slugPath, `[...${key}]`);
+        } else {
+          // Regular dynamic routes [id]
+          pathname = pathname.replace(String(value), `[${key}]`);
+        }
       }
     }
   }
@@ -459,8 +468,8 @@ function createWrappedAppRouterHandler<T extends NextRouteHandler>(
     });
     // Get route path
     const routePath = options.routeExtractor ? 
-      options.routeExtractor(request, context) :
-      extractNextRoute(request, context);
+      await Promise.resolve(options.routeExtractor(request, context)) :
+      await extractNextRoute(request, context);
 
     if (options.debugVerbose) {
       console.log('==== DEBUG: TREBLLE ROUTE PATH ====');

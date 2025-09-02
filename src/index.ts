@@ -5,6 +5,15 @@
  */
 
 import { TreblleOptions, TreblleError } from './types';
+import {
+  withTreblle as withTreblleNext,
+  withTrebllePages,
+  withTreblleMiddleware as withTreblleMiddlewareNext,
+  createTreblleWrapper,
+  createMiddlewareWrapper,
+  treblleHandler,
+  treblleApiHandler
+} from './integrations/nextjs';
 import { maskSensitiveData } from './masking';
 import { 
   getCurrentEnvironment, 
@@ -601,3 +610,11 @@ class Treblle {
 // Export the Treblle class as both default and named export
 export { Treblle };
 export default Treblle;
+
+// Root-level Next.js integration aliases for ergonomics
+export const withTreblle = withTreblleNext;
+export const nextTreblle = withTreblleNext;
+export { withTrebllePages };
+export const withTreblleMiddleware = withTreblleMiddlewareNext;
+export const nextMiddlewareTreblle = withTreblleMiddlewareNext;
+export { createTreblleWrapper, createMiddlewareWrapper, treblleHandler, treblleApiHandler };
