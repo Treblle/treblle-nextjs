@@ -445,7 +445,7 @@ class Treblle {
         const line = stackLines[i].trim();
         
         // Look for the common Node.js stack trace format
-        const match = line.match(/at\s+(?:.*?\s+\()?(?:(.+):(\d+):(\d+))/);
+        const match = line.match(/at\s+(?:[^(]*\()?([^():]+):(\d+):(\d+)\)?$/);
         if (match) {
           const [_, filePath, lineNumber] = match;
           
