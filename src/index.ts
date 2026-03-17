@@ -444,18 +444,28 @@ class Treblle {
       for (let i = 1; i < stackLines.length; i++) {
         const line = stackLines[i].trim();
         
-        // Look for the common Node.js stack trace format
-        const match = line.match(/at\s+(?:[^(]*\()?([^():]+):(\d+):(\d+)\)?$/);
-        if (match) {
-          const [_, filePath, lineNumber] = match;
-          
-          // Extract just the filename from the path
-          const fileName = filePath.split(/[\/\\]/).pop() || 'unknown';
-          
-          errorInfo.file = fileName;
-          errorInfo.line = parseInt(lineNumber, 10);
-          break;
-        }
+        // Look for the common Node.js stack trace format: "at [fn (]path:line:col[)]"
+        if (!line.startsWith('at ')) continue;
+        const rest = line.slice(3);
+        // Path is inside parens when a function name is present, otherwise it's the whole rest
+        const parenStart = rest.lastIndexOf('(');
+        const parenEnd = rest.lastIndexOf(')');
+        const pathPart = (parenStart >= 0 && parenEnd > parenStart)
+          ? rest.slice(parenStart + 1, parenEnd)
+          : rest;
+        // Extract line number from the trailing :line:col suffix
+        const lastColon = pathPart.lastIndexOf(':');
+        if (lastColon < 0) continue;
+        const secondLastColon = pathPart.lastIndexOf(':', lastColon - 1);
+        if (secondLastColon < 0) continue;
+        const lineNumber = parseInt(pathPart.slice(secondLastColon + 1, lastColon), 10);
+        if (isNaN(lineNumber)) continue;
+        const filePath = pathPart.slice(0, secondLastColon);
+
+        const fileName = filePath.split(/[/\\]/).pop() || 'unknown';
+        errorInfo.file = fileName;
+        errorInfo.line = lineNumber;
+        break;
       }
     } catch (e: unknown) {
       // If parsing fails, use the default values
