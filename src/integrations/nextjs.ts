@@ -250,9 +250,7 @@ function matchesMiddlewareConfig(request: NextRequest, config?: MiddlewareConfig
       const pattern = matcher.replace(/\*/g, '.*').replace(/\?/g, '\\?');
       return new RegExp(`^${pattern}$`).test(pathname);
     } else {
-      const sourcePattern = matcher.source.replace(/\*/g, '.*').replace(/\?/g, '\\?');
-      
-      if (!new RegExp(`^${sourcePattern}$`).test(pathname)) {
+      if (!new RegExp(`^${matcher.source}$`).test(pathname)) {
         return false;
       }
       
