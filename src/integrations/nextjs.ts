@@ -247,12 +247,13 @@ function matchesMiddlewareConfig(request: NextRequest, config?: MiddlewareConfig
   
   return matchers.some(matcher => {
     if (typeof matcher === 'string') {
-      const pattern = matcher.replace(/\*/g, '.*').replace(/\?/g, '\\?');
+      // Escape regex special chars first, then convert glob wildcards.
+      // Use [^/]* for * (stay within one path segment) to avoid backtracking.
+      const escaped = matcher.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+      const pattern = escaped.replace(/\*\*/g, '.+').replace(/\*/g, '[^/]+').replace(/\?/g, '[^/]');
       return new RegExp(`^${pattern}$`).test(pathname);
     } else {
-      const sourcePattern = matcher.source.replace(/\*/g, '.*').replace(/\?/g, '\\?');
-      
-      if (!new RegExp(`^${sourcePattern}$`).test(pathname)) {
+      if (!new RegExp(`^${matcher.source}$`).test(pathname)) {
         return false;
       }
       
